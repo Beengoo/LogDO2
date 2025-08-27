@@ -1,0 +1,30 @@
+plugins {
+    id("xyz.jpenilla.run-paper") version "2.3.1"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+}
+
+dependencies {
+    compileOnly("io.papermc.paper:paper-api:1.21.6-R0.1-SNAPSHOT")
+    implementation project(":api")
+    implementation project(":core")
+
+    // Discord / Web / HTTP / JSON
+    implementation "net.dv8tion:JDA:5.0.0"
+    implementation "io.javalin:javalin:6.7.0"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.17.2"
+
+    // DB
+    implementation "com.zaxxer:HikariCP:5.1.0"
+    implementation "org.xerial:sqlite-jdbc:3.46.0.0"
+    implementation "org.postgresql:postgresql:42.7.4"
+    implementation "com.mysql:mysql-connector-j:8.4.0"
+}
+
+tasks {
+    runServer { minecraftVersion("1.21.6") }
+    shadowJar {
+        archiveClassifier.set("")
+    }
+    build { dependsOn(shadowJar) }
+}

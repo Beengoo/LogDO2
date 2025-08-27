@@ -1,0 +1,48 @@
+web:
+  port: 8080
+  publicUrl: "http://localhost:8080"
+
+discord:
+  botToken: "YOUR_BOT_TOKEN"
+
+oauth:
+  clientId: "DISCORD_OAUTH_CLIENT_ID"
+  clientSecret: "DISCORD_OAUTH_CLIENT_SECRET"
+  scopes: "identify email applications.commands"
+
+database:
+  driver: sqlite
+  url: "jdbc:sqlite:plugins/LogDO2/logdo2.db"
+  username: ""
+  password: ""
+  pool:
+    maxPoolSize: 8
+
+#database:
+#  url: "jdbc:mysql://localhost:3306/logdo2?useSSL=false&serverTimezone=UTC&characterEncoding=utf8"
+#  username: "logdo2"
+#  password: "secret"
+#  driver: mysql
+
+#database:
+#  url: "jdbc:postgresql://localhost:5432/logdo2"
+#  username: "logdo2"
+#  password: "secret"
+#  driver: postgres
+
+security:
+  # Valid but better to generate your own, for example: openssl rand -base64 32
+  tokenEncryptionKeyBase64: "wBBZdmmPuvKZFZSw42aEJ+CoZGSgV8QsCDW01kfk6n0="
+
+bans:
+  enabled: true
+  baseSeconds: 1800
+  multiplier: 2.0
+  maxSeconds: 604800
+  trackWindowSeconds: 2592000
+  reasonTemplate: "Suspicious login attempt. Ban: %DURATION%."
+
+
+timeouts:
+  loginSeconds: 300
+  ipConfirmSeconds: 180

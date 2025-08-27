@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(':api')
+    compileOnly("io.papermc.paper:paper-api:1.21.6-R0.1-SNAPSHOT")
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+}

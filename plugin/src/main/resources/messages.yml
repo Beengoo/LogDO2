@@ -1,0 +1,43 @@
+# Use & for Minecraft color codes. Placeholders: {name}, {ip}, {code}, {url}, {duration}, {remaining}
+prelogin:
+  banned: "&cYou are banned. Remaining: {remaining}"
+
+login:
+  first_join:
+    title: "&eAuthorize via Discord"
+    subtitle: "&7Click the chat link to link your account"
+    click_text: "[Click here to authorize]"
+    click_hover: "Open Discord OAuth2"
+  bedrock:
+    code_hint: "&eOpen Discord and run &b/login {code} &ewith the bot."
+  linked:
+    actionbar: "&aLogin valid"
+
+ip:
+  unconfirmed:
+    title: "&cIP not confirmed"
+    subtitle: "&7Check your Discord DM"
+  confirm_actionbar: "&aIP confirmed. You can play now."
+  reject_actionbar: "&cLogin rejected. IP banned for {duration}."
+  reject_kick: "Login rejected by account owner. Ban {duration}."
+
+oauth:
+  linked_actionbar: "&aDiscord linked. Welcome, {name}!"
+
+timeouts:
+  login_kick: "Login timed out. Please rejoin to try again."
+  ip_kick: "IP confirmation timed out. Please rejoin to request again."
+
+chat:
+  auth_link_text: "&a[Click here to authorize]"
+  auth_link_hover: "Open Discord OAuth2"
+
+discord:
+  first_login_dm: "Your Minecraft account {name} ({uuid}) has been linked. Welcome!"
+  ip_confirm_title: "New login detected"
+  ip_confirm_title_confirmed: "✅ Login confirmed for {name} ({uuid})"
+  ip_confirm_title_rejected: "❌ Login rejected for {name} ({uuid})"
+  ip_confirm_body: "Someone tried to log into {name} ({uuid}) from IP {ip}. Confirm?"
+  ip_confirm_button_accept: "Confirm"
+  ip_confirm_button_reject: "Reject"
+  finalize_oauth_link: "Finish linking: {url}"

@@ -1,0 +1,22 @@
+name: LogDO2
+main: ua.beengoo.logdo2.plugin.LogDO2
+version: ${version}
+api-version: "1.20"
+folia-supported: true
+commands:
+  logdo2:
+    description: Main LogDO2 command
+    usage: "/logdo2 <help|link|logout|forgive|reload>"
+    permission: logdo2.admin
+permissions:
+  logdo2.admin:
+    default: op
+    children:
+      logdo2.admin.link: true
+      logdo2.admin.logout: true
+      logdo2.admin.forgive: true
+      logdo2.admin.reload: true
+  logdo2.admin.link: { default: op }
+  logdo2.admin.logout: { default: op }
+  logdo2.admin.forgive: { default: op }
+  logdo2.admin.reload: { default: op }

@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:1.21.6-R0.1-SNAPSHOT"
+    compileOnly "org.jetbrains:annotations:24.1.0"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.3"
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+tasks.withType(Test).configureEach { useJUnitPlatform() }
