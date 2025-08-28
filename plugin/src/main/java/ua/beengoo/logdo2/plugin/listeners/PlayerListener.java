@@ -1,20 +1,22 @@
 package ua.beengoo.logdo2.plugin.listeners;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.*;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 
 import java.util.Optional;
 
 
 public class PlayerListener implements Listener {
     private final LoginService loginService;
+    private final FloodgateHook floodgate;
 
-    public PlayerListener(LoginService loginService) {
+    public PlayerListener(LoginService loginService, FloodgateHook floodgate) {
         this.loginService = loginService;
+        this.floodgate = floodgate;
     }
 
     // === ENTRY POINT ===
@@ -22,7 +24,6 @@ public class PlayerListener implements Listener {
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         String ip = getIp(p);
-        // Визначаємо стан і виконуємо необхідні дії (OAuth link / DM confirm / just welcome)
         loginService.onPlayerJoin(p.getUniqueId(), p.getName(), ip, isBedrock(p));
     }
 
@@ -69,8 +70,11 @@ public class PlayerListener implements Listener {
                 .map(a -> a.getAddress().getHostAddress()).orElse("unknown");
     }
 
-    private static boolean isBedrock(Player p) {
-        // TODO: якщо є Floodgate – перевірити через API. Поки що false.
-        return false;
+    private boolean isBedrock(Player p) {
+        try {
+            return floodgate != null && floodgate.isPresent() && floodgate.isBedrock(p.getUniqueId());
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }

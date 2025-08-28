@@ -22,6 +22,7 @@ import ua.beengoo.logdo2.plugin.discord.SlashCommandRegistrar;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.listeners.PlayerListener;
 import ua.beengoo.logdo2.plugin.listeners.PreLoginListener;
+import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
 import ua.beengoo.logdo2.plugin.util.TokenCrypto;
 import ua.beengoo.logdo2.plugin.web.LoginEndpoint;
@@ -48,6 +49,7 @@ public final class LogDO2 extends JavaPlugin {
 
     private DatabaseManager db;
     private LoginService loginService;
+    private FloodgateHook floodgate;
 
     @Override
     public void onEnable() {
@@ -142,8 +144,10 @@ public final class LogDO2 extends JavaPlugin {
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 
         // Bukkit listeners & timeouts
+        this.floodgate = new FloodgateHook();
+        if (floodgate.isPresent()) getLogger().info("[LogDO2] Floodgate detected. Bedrock support enabled.");
         Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages), this);
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate), this);
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,
                 Duration.ofSeconds(loginSec),
