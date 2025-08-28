@@ -37,7 +37,7 @@ public class LoginEndpoint {
         }
 
         try {
-            String authUrl = loginService.buildDiscordAuthUrl(state); // валідність перевіряється всередині
+            String authUrl = loginService.buildDiscordAuthUrl(state);
             ctx.redirect(authUrl);
         } catch (Exception ex) {
             logger.warning("Login state error: " + ex.getMessage());

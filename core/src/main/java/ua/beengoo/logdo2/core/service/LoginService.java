@@ -151,6 +151,11 @@ public class LoginService {
         var tokenSet = oauth.exchangeCode(code, redirectUri);
         var user = oauth.fetchUser(tokenSet.accessToken());
 
+        // Ensure Discord user exists before creating FK-dependent records
+        if (discordUserRepo != null) {
+            discordUserRepo.upsertUser(user.id(), user.username(), user.globalName(), user.email(), user.avatar());
+        }
+
         // If profile is already linked/reserved for another Discord user, block with 403
         var existing = accounts.findAnyDiscordForProfile(st.uuid());
         if (existing.isPresent() && existing.get() != user.id()) {
@@ -174,7 +179,6 @@ public class LoginService {
         tokens.save(user.id(), tokenSet.accessToken(), tokenSet.refreshToken(), tokenSet.expiresAt(),
                 tokenSet.tokenType(), tokenSet.scope());
         if (discordUserRepo != null) {
-            discordUserRepo.upsertUser(user.id(), user.username(), user.globalName(), user.email(), user.avatar());
             boolean hasCommands = tokenSet.scope() != null && tokenSet.scope().contains("applications.commands");
             discordUserRepo.setCommandsInstalled(user.id(), hasCommands);
         }
@@ -281,9 +285,7 @@ public class LoginService {
 
     // === UI & main-thread helpers ===
     private void sendClickableAuth(UUID uuid, String text, String hover, String loginUrl) {
-        runMain(() -> {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p == null) return;
+        runPlayer(uuid, p -> {
             Component comp = Component.text(text)
                     .hoverEvent(HoverEvent.showText(Component.text(hover)))
                     .clickEvent(ClickEvent.openUrl(loginUrl));
@@ -292,17 +294,11 @@ public class LoginService {
     }
 
     private void sendBedrockHint(UUID uuid, String line) {
-        runMain(() -> {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p != null) p.sendMessage(line);
-        });
+        runPlayer(uuid, p -> p.sendMessage(line));
     }
 
     private void sendTitle(UUID uuid, String title, String subtitle, int in, int stay, int out) {
-        runMain(() -> {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p != null) p.sendTitle(title, subtitle, in, stay, out);
-        });
+        runPlayer(uuid, p -> p.sendTitle(title, subtitle, in, stay, out));
     }
 
     public void showLoginPhaseTitle(UUID uuid) {
@@ -314,32 +310,65 @@ public class LoginService {
     }
 
     public void clearPhaseTitle(UUID uuid) {
-        runMain(() -> {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p != null) {
-                try { p.clearTitle(); } catch (Throwable ignored) { /* older API fallback */ }
-                try { p.resetTitle(); } catch (Throwable ignored) { /* older API fallback */ }
-            }
+        runPlayer(uuid, p -> {
+            try { p.clearTitle(); } catch (Throwable ignored) { /* older API fallback */ }
+            try { p.resetTitle(); } catch (Throwable ignored) { /* older API fallback */ }
         });
     }
 
     private void sendActionBar(UUID uuid, String msgLine) {
-        runMain(() -> {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p != null) p.sendActionBar(msgLine);
-        });
+        runPlayer(uuid, p -> p.sendActionBar(msgLine));
     }
 
     private void kick(UUID uuid, String reason) {
-        runMain(() -> {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p != null) p.kickPlayer(reason);
-        });
+        runPlayer(uuid, p -> p.kickPlayer(reason));
     }
 
     private void runMain(Runnable r) {
-        if (Bukkit.isPrimaryThread()) r.run();
-        else Bukkit.getScheduler().runTask(plugin, r);
+        if (Bukkit.isPrimaryThread()) {
+            r.run();
+            return;
+        }
+        // Prefer Folia/Paper schedulers if available
+        try {
+            // Paper API on both Paper and Folia
+            Bukkit.getGlobalRegionScheduler().execute(plugin, r);
+        } catch (Throwable ignored) {
+            // Fallback to legacy Bukkit scheduler (non-Folia)
+            try {
+                Bukkit.getScheduler().runTask(plugin, r);
+            } catch (Throwable t) {
+                throw new UnsupportedOperationException("No compatible scheduler available", t);
+            }
+        }
+    }
+
+    private void runPlayer(UUID uuid, java.util.function.Consumer<Player> action) {
+        if (Bukkit.isPrimaryThread()) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) action.accept(p);
+            return;
+        }
+        try {
+            // Resolve player on the global scheduler, then switch to player scheduler
+            Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) {
+                    try {
+                        p.getScheduler().execute(plugin, () -> action.accept(p), null, 0L);
+                    } catch (Throwable ignored) {
+                        // If player scheduler is not available, run action immediately (Paper non-Folia)
+                        action.accept(p);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+            // Non-Folia fallback
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) action.accept(p);
+            });
+        }
     }
 
     private static String humanDuration(long seconds) {
