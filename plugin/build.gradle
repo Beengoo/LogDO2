@@ -3,6 +3,9 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
+// Ensure this subproject explicitly uses the root project version
+version = rootProject.version
+
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.6-R0.1-SNAPSHOT")
     implementation project(":api")
@@ -24,7 +27,20 @@ dependencies {
 tasks {
     runServer { minecraftVersion("1.21.6") }
     shadowJar {
+        // Name final jar as root project name + version, no classifier
         archiveClassifier.set("")
+        archiveBaseName.set(rootProject.name)
+        archiveVersion.set(rootProject.version as String)
     }
     build { dependsOn(shadowJar) }
+}
+
+// Inject project version into plugin.yml (replaces ${version})
+tasks.processResources {
+    def props = [version: rootProject.version]
+    inputs.properties props
+    filteringCharset = 'UTF-8'
+    filesMatching('**/plugin.yml') {
+        expand props
+    }
 }
