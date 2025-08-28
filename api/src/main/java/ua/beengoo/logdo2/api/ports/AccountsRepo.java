@@ -19,6 +19,8 @@ public interface AccountsRepo {
     /** Returns any discord id reserved/linked for this profile, regardless of active flag. */
     Optional<Long> findAnyDiscordForProfile(UUID profileUuid);
     Set<UUID> findProfilesForDiscord(long discordId);
+    /** Count profiles linked to discord by platform (platform values: "JAVA"/"BEDROCK"). */
+    int countByDiscordAndPlatform(long discordId, String platform, boolean includeReserved);
     void unlinkByProfile(java.util.UUID profileUuid);
     void unlinkByDiscord(long discordId);
 

@@ -216,4 +216,22 @@ public class JdbcAccountsRepo implements AccountsRepo {
         } catch (Exception e) { throw new RuntimeException(e); }
         return out;
     }
+
+    @Override
+    public int countByDiscordAndPlatform(long discordId, String platform, boolean includeReserved) {
+        String sql = "SELECT COUNT(1) FROM links l JOIN mc_profiles p ON p.mc_uuid = l.mc_uuid " +
+                "WHERE l.discord_id=? " +
+                (includeReserved ? "" : "AND l.active=1 ") +
+                "AND UPPER(p.platform)=UPPER(?)";
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            ps.setString(2, platform);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+                return 0;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

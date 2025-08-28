@@ -33,6 +33,9 @@ public class LoginService {
     private final long banBaseSec, banMaxSec, banTrackWindowSec;
     private final double banMultiplier;
     private final String banReasonTpl;
+    private final int javaLimitPerDiscord;
+    private final int bedrockLimitPerDiscord;
+    private final boolean limitIncludeReserved;
 
     public LoginService(OAuthPort oauth, DiscordDmPort dm,
                         AccountsRepo accounts, ProfileRepo profiles, TokensRepo tokens,
@@ -45,7 +48,10 @@ public class LoginService {
                         long banBaseSec, double banMultiplier,
                         long banMaxSec, long banTrackWindowSec,
                         String banReasonTpl,
-                        MessagesPort messages) {
+                        MessagesPort messages,
+                        int javaLimitPerDiscord,
+                        int bedrockLimitPerDiscord,
+                        boolean limitIncludeReserved) {
         this.oauth = oauth;
         this.dm = dm;
         this.accounts = accounts;
@@ -68,6 +74,10 @@ public class LoginService {
         this.banReasonTpl = (banReasonTpl == null || banReasonTpl.isBlank())
                 ? "Suspicious login attempt. Ban: %DURATION%."
                 : banReasonTpl;
+
+        this.javaLimitPerDiscord = Math.max(0, javaLimitPerDiscord);
+        this.bedrockLimitPerDiscord = Math.max(0, bedrockLimitPerDiscord);
+        this.limitIncludeReserved = limitIncludeReserved;
     }
 
     public void setDiscordDmPort(DiscordDmPort dm) { this.dm = dm; }
@@ -153,6 +163,19 @@ public class LoginService {
             throw new ForbiddenLinkException("Profile is reserved for a different Discord account");
         }
 
+        // Enforce per-Discord platform limits unless already linked to same discord
+        String platform = st.bedrock() ? "BEDROCK" : "JAVA";
+        var cur = accounts.findDiscordForProfile(st.uuid());
+        if (cur.isEmpty() || cur.get() != user.id()) {
+            int limit = st.bedrock() ? bedrockLimitPerDiscord : javaLimitPerDiscord;
+            if (limit > 0) {
+                int count = accounts.countByDiscordAndPlatform(user.id(), platform, limitIncludeReserved);
+                if (count >= limit) {
+                    throw new ForbiddenLinkException("Link limit reached for platform " + platform);
+                }
+            }
+        }
+
         accounts.activate(user.id(), st.uuid());
         tokens.save(user.id(), tokenSet.accessToken(), tokenSet.refreshToken(), tokenSet.expiresAt(),
                 tokenSet.tokenType(), tokenSet.scope());
@@ -202,6 +225,13 @@ public class LoginService {
     public boolean onDiscordSlashLogin(String code, long discordUserId) {
         var pending = state.consumeOneTimeCode(code);
         if (pending == null) return false;
+
+        // Enforce Bedrock per-Discord limit before reserve
+        int limit = bedrockLimitPerDiscord;
+        if (limit > 0) {
+            int count = accounts.countByDiscordAndPlatform(discordUserId, "BEDROCK", limitIncludeReserved);
+            if (count >= limit) return false;
+        }
 
         // Reserve the link, full activation happens after OAuth
         accounts.reserve(discordUserId, pending.uuid());

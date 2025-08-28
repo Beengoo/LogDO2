@@ -159,7 +159,11 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
     private void handleReload(CommandSender sender) {
         if (!sender.hasPermission("logdo2.admin.reload")) { noPerm(sender); return; }
-        Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("LogDO2")).reloadConfig();
+        var pl = Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("LogDO2"));
+        pl.reloadConfig();
+        if (pl instanceof ua.beengoo.logdo2.plugin.LogDO2 main) {
+            main.updateConfigDefaults(); // merge any new defaults into existing file
+        }
         if (msg instanceof ua.beengoo.logdo2.plugin.i18n.YamlMessages ym) ym.reload();
         sender.sendMessage("§aLogDO2 configuration reloaded!");
     }

@@ -47,6 +47,12 @@ timeouts:
   loginSeconds: 300
   ipConfirmSeconds: 180
 
+limits:
+  perDiscord:
+    java: 1
+    bedrock: 1
+    includeReserved: false
+
 gates:
   # What actions are allowed during the first login (before OAuth)
   login:
@@ -55,6 +61,8 @@ gates:
     chat: false
     commands: false
     commandsAllowed: []
+    blindness: false
+    hidePlayers: false
     drop: false
     inventory: false
     damage: true
@@ -65,6 +73,8 @@ gates:
     chat: false
     commands: false
     commandsAllowed: []
+    blindness: false
+    hidePlayers: false
     drop: false
     inventory: false
     damage: true

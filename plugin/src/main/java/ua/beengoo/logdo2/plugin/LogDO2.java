@@ -54,6 +54,8 @@ public final class LogDO2 extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        // Merge any new default keys into existing config.yml (non-destructive for user values)
+        updateConfigDefaults();
         this.messages = new YamlMessages(this);
 
         int    webPort      = getConfig().getInt("web.port", 8080);
@@ -72,6 +74,11 @@ public final class LogDO2 extends JavaPlugin {
         long    maxSec      = getConfig().getLong("bans.maxSeconds", 604800L);
         long    windowSec   = getConfig().getLong("bans.trackWindowSeconds", 2592000L);
         String  reasonTpl   = getConfig().getString("bans.reasonTemplate", "Suspicious login attempt. Ban: %DURATION%.");
+
+        // Limits
+        int javaLimit    = getConfig().getInt("limits.perDiscord.java", 1);
+        int bedrockLimit = getConfig().getInt("limits.perDiscord.bedrock", 1);
+        boolean includeReserved = getConfig().getBoolean("limits.perDiscord.includeReserved", false);
 
         // DB → migrations
         this.db = new DatabaseManager(this);
@@ -109,7 +116,10 @@ public final class LogDO2 extends JavaPlugin {
                 bansEnabled,
                 baseSec, mult, maxSec, windowSec,
                 reasonTpl,
-                messages
+                messages,
+                javaLimit,
+                bedrockLimit,
+                includeReserved
         );
 
 
@@ -165,6 +175,34 @@ public final class LogDO2 extends JavaPlugin {
         if (jda != null) jda.shutdownNow();
         if (db != null) db.stop();
         getLogger().info("LogDO2 disabled.");
+    }
+
+    public void updateConfigDefaults() {
+        try {
+            java.io.InputStream in = getResource("config.yml");
+            if (in == null) return;
+            String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            org.bukkit.configuration.file.YamlConfiguration defaults = new org.bukkit.configuration.file.YamlConfiguration();
+            defaults.loadFromString(text);
+
+            java.io.File file = new java.io.File(getDataFolder(), "config.yml");
+            org.bukkit.configuration.file.YamlConfiguration cfg = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+
+            boolean changed = false;
+            for (String key : defaults.getKeys(true)) {
+                // Only add keys that are truly missing from file (ignore defaults)
+                if (!cfg.isSet(key)) {
+                    cfg.set(key, defaults.get(key));
+                    changed = true;
+                }
+            }
+            if (changed) {
+                cfg.save(file);
+                reloadConfig();
+            }
+        } catch (Exception e) {
+            getLogger().warning("Failed to merge default config: " + e.getMessage());
+        }
     }
 
     private static String stripTrailingSlash(String s) {
