@@ -120,7 +120,7 @@ public final class LogDO2 extends JavaPlugin {
                         GatewayIntent.DIRECT_MESSAGES
                 )
                 .addEventListeners(
-                        new JdaSlashLoginListener(loginService, getLogger()),
+                        new JdaSlashLoginListener(loginService, getLogger(), messages),
                         new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger()),
                         new ListenerAdapter() {
                             @Override public void onReady(ReadyEvent event) {
@@ -147,7 +147,7 @@ public final class LogDO2 extends JavaPlugin {
         this.floodgate = new FloodgateHook();
         if (floodgate.isPresent()) getLogger().info("[LogDO2] Floodgate detected. Bedrock support enabled.");
         Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages), this);
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this), this);
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,
                 Duration.ofSeconds(loginSec),

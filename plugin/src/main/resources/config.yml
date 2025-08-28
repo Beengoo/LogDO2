@@ -46,3 +46,25 @@ bans:
 timeouts:
   loginSeconds: 300
   ipConfirmSeconds: 180
+
+gates:
+  # What actions are allowed during the first login (before OAuth)
+  login:
+    move: false
+    interact: false
+    chat: false
+    commands: false
+    commandsAllowed: []
+    drop: false
+    inventory: false
+    damage: true
+  # What actions are allowed while waiting for IP confirmation
+  ipConfirm:
+    move: false
+    interact: false
+    chat: false
+    commands: false
+    commandsAllowed: []
+    drop: false
+    inventory: false
+    damage: true

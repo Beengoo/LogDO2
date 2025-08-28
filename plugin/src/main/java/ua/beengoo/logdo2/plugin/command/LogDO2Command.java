@@ -76,12 +76,13 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         try { discordId = Long.parseLong(args[2]); }
         catch (NumberFormatException e) { sender.sendMessage("§cInvalid Discord ID."); return; }
 
-        if (accountsRepo.isLinked(puuid)) {
-            sender.sendMessage("§cPlayer already linked. Use /logdo2 logout first.");
+        // Do not overwrite if any link (reserved or active) already exists for this profile
+        if (accountsRepo.findAnyDiscordForProfile(puuid).isPresent()) {
+            sender.sendMessage("§cProfile already reserved/linked. Use /logdo2 logout first.");
             return;
         }
-        accountsRepo.link(discordId, puuid);
-        sender.sendMessage("§aLinked " + puuid + " to Discord " + discordId + ".");
+        accountsRepo.reserve(discordId, puuid);
+        sender.sendMessage("§aReserved profile " + puuid + " for Discord " + discordId + ". Player must authenticate via OAuth.");
     }
 
     private void handleLogout(CommandSender sender, String[] args) {
@@ -94,6 +95,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             UUID uuid = resolveUuid(args[2]);
             if (uuid == null) { sender.sendMessage("§cUnknown player: " + args[2]); return; }
             accountsRepo.unlinkByDiscordAndProfile(discordId, uuid);
+            kickIfOnline(uuid, msg.mc("admin.logout_kick"));
             sender.sendMessage("§aUnlinked Discord " + discordId + " from player " + uuid + ".");
             return;
         }
@@ -105,6 +107,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         UUID uuidByName = resolveUuid(target);
         if (uuidByName != null) {
             accountsRepo.unlinkByProfile(uuidByName);
+            kickIfOnline(uuidByName, msg.mc("admin.logout_kick"));
             sender.sendMessage("§aUnlinked player §e" + target + " §7(" + uuidByName + ")");
             return;
         }
@@ -113,6 +116,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         try {
             UUID puuid = UUID.fromString(target);
             accountsRepo.unlinkByProfile(puuid);
+            kickIfOnline(puuid, msg.mc("admin.logout_kick"));
             sender.sendMessage("§aUnlinked player " + puuid + ".");
             return;
         } catch (IllegalArgumentException ignore) { }
@@ -120,12 +124,19 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         // discord id →
         if (isNumeric(target)) {
             long did = Long.parseLong(target);
+            // Kick any online players linked to this Discord
+            for (UUID u : accountsRepo.findProfilesForDiscord(did)) kickIfOnline(u, msg.mc("admin.logout_kick"));
             accountsRepo.unlinkByDiscord(did);
             sender.sendMessage("§aUnlinked all players for Discord " + did + ".");
             return;
         }
 
         sender.sendMessage("§cCan't resolve target. Use player name/uuid or discord id.");
+    }
+
+    private static void kickIfOnline(UUID uuid, String reason) {
+        Player p = Bukkit.getPlayer(uuid);
+        if (p != null && p.isOnline()) p.kickPlayer(reason);
     }
 
     private void handleForgive(CommandSender sender, String[] args) {

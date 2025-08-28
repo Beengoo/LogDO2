@@ -41,3 +41,9 @@ discord:
   ip_confirm_button_accept: "Confirm"
   ip_confirm_button_reject: "Reject"
   finalize_oauth_link: "Finish linking: {url}"
+  slash_login_ok: "✅ Linked. Check in-game and finish OAuth if prompted."
+  slash_login_invalid: "❌ Invalid or expired code. Rejoin the server to get a new one."
+  slash_login_missing_code: "Missing required option: code"
+
+admin:
+  logout_kick: "&cYou have been logged out by an admin. Please rejoin to link again."

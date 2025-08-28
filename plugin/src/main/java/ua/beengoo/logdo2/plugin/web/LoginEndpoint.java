@@ -4,6 +4,7 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.core.service.ForbiddenLinkException;
 
 import java.util.logging.Logger;
 
@@ -54,6 +55,9 @@ public class LoginEndpoint {
         try {
             loginService.onOAuthCallback(code, state);
             ctx.result("Discord account linked. You can return to the game.");
+        } catch (ForbiddenLinkException ex) {
+            logger.warning("OAuth forbidden: " + ex.getMessage());
+            ctx.status(403).result("Forbidden: profile reserved for another Discord account");
         } catch (Exception ex) {
             logger.warning("OAuth callback failed: " + ex.getMessage());
             ctx.status(400).result("OAuth error");

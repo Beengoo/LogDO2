@@ -147,7 +147,13 @@ public class LoginService {
         var tokenSet = oauth.exchangeCode(code, redirectUri);
         var user = oauth.fetchUser(tokenSet.accessToken());
 
-        accounts.link(user.id(), st.uuid());
+        // If profile is already linked/reserved for another Discord user, block with 403
+        var existing = accounts.findAnyDiscordForProfile(st.uuid());
+        if (existing.isPresent() && existing.get() != user.id()) {
+            throw new ForbiddenLinkException("Profile is reserved for a different Discord account");
+        }
+
+        accounts.activate(user.id(), st.uuid());
         tokens.save(user.id(), tokenSet.accessToken(), tokenSet.refreshToken(), tokenSet.expiresAt(),
                 tokenSet.tokenType(), tokenSet.scope());
         if (discordUserRepo != null) {
@@ -197,7 +203,8 @@ public class LoginService {
         var pending = state.consumeOneTimeCode(code);
         if (pending == null) return false;
 
-        accounts.link(discordUserId, pending.uuid());
+        // Reserve the link, full activation happens after OAuth
+        accounts.reserve(discordUserId, pending.uuid());
         profiles.updateLastConfirmedIp(pending.uuid(), pending.ip());
         profiles.updatePlatform(pending.uuid(), "BEDROCK");
 

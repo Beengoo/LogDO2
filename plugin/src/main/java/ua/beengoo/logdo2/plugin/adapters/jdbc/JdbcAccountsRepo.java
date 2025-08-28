@@ -21,10 +21,16 @@ public class JdbcAccountsRepo implements AccountsRepo {
 
     @Override
     public void unlinkByProfile(UUID profileUuid) {
-        try (var c = ds.getConnection();
-             var ps = c.prepareStatement("DELETE FROM links WHERE mc_uuid=?")) {
-            ps.setString(1, profileUuid.toString());
-            ps.executeUpdate();
+        try (Connection c = ds.getConnection()) {
+            try (PreparedStatement ps = c.prepareStatement("DELETE FROM links WHERE mc_uuid=?")) {
+                ps.setString(1, profileUuid.toString());
+                ps.executeUpdate();
+            }
+            // Also remove profile record to fully clear association state
+            try (PreparedStatement ps2 = c.prepareStatement("DELETE FROM mc_profiles WHERE mc_uuid=?")) {
+                ps2.setString(1, profileUuid.toString());
+                ps2.executeUpdate();
+            }
         } catch (Exception e) { throw new RuntimeException(e); }
     }
 
@@ -39,16 +45,29 @@ public class JdbcAccountsRepo implements AccountsRepo {
 
     @Override
     public void unlinkByDiscordAndProfile(long discordId, UUID profileUuid) {
-        try (var c = ds.getConnection();
-             var ps = c.prepareStatement("DELETE FROM links WHERE discord_id=? AND mc_uuid=?")) {
-            ps.setLong(1, discordId);
-            ps.setString(2, profileUuid.toString());
-            ps.executeUpdate();
+        try (Connection c = ds.getConnection()) {
+            try (PreparedStatement ps = c.prepareStatement("DELETE FROM links WHERE discord_id=? AND mc_uuid=?")) {
+                ps.setLong(1, discordId);
+                ps.setString(2, profileUuid.toString());
+                ps.executeUpdate();
+            }
+            // Also remove the profile row for that UUID
+            try (PreparedStatement ps2 = c.prepareStatement("DELETE FROM mc_profiles WHERE mc_uuid=?")) {
+                ps2.setString(1, profileUuid.toString());
+                ps2.executeUpdate();
+            }
         } catch (Exception e) { throw new RuntimeException(e); }
     }
 
     @Override
     public void link(long discordId, UUID profileUuid) {
+        // For backward compatibility: perform full activation
+        reserve(discordId, profileUuid);
+        activate(discordId, profileUuid);
+    }
+
+    @Override
+    public void reserve(long discordId, UUID profileUuid) {
         long now = Instant.now().getEpochSecond();
         try (Connection c = ds.getConnection()) {
             // ensure mc_profile exists
@@ -79,7 +98,35 @@ public class JdbcAccountsRepo implements AccountsRepo {
                 }
                 ps.executeUpdate();
             }
-            // link (activate)
+            // link (reserve: active=0)
+            String sql = switch (dialect) {
+                case POSTGRES, SQLITE -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,0,?) " +
+                        "ON CONFLICT(discord_id, mc_uuid) DO UPDATE SET active=0";
+                case MYSQL -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,0,?) " +
+                        "ON DUPLICATE KEY UPDATE active=VALUES(active)";
+            };
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setLong(1, discordId);
+                ps.setString(2, profileUuid.toString());
+                ps.setLong(3, now);
+                ps.executeUpdate();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void activate(long discordId, UUID profileUuid) {
+        long now = Instant.now().getEpochSecond();
+        try (Connection c = ds.getConnection()) {
+            // Deactivate other links for this profile
+            try (PreparedStatement ps = c.prepareStatement("UPDATE links SET active=0 WHERE mc_uuid=? AND discord_id<>?")) {
+                ps.setString(1, profileUuid.toString());
+                ps.setLong(2, discordId);
+                ps.executeUpdate();
+            }
+            // Upsert this pair as active=1
             String sql = switch (dialect) {
                 case POSTGRES, SQLITE -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,1,?) " +
                         "ON CONFLICT(discord_id, mc_uuid) DO UPDATE SET active=1";
@@ -137,6 +184,18 @@ public class JdbcAccountsRepo implements AccountsRepo {
     public Optional<Long> findDiscordForProfile(UUID profileUuid) {
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement("SELECT discord_id FROM links WHERE mc_uuid=? AND active=1 LIMIT 1")) {
+            ps.setString(1, profileUuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return Optional.of(rs.getLong(1));
+                return Optional.empty();
+            }
+        } catch (Exception e) { throw new RuntimeException(e); }
+    }
+
+    @Override
+    public Optional<Long> findAnyDiscordForProfile(UUID profileUuid) {
+        String sql = "SELECT discord_id FROM links WHERE mc_uuid=? ORDER BY active DESC LIMIT 1";
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, profileUuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return Optional.of(rs.getLong(1));
