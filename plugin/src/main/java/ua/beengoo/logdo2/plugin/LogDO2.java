@@ -26,6 +26,7 @@ import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
 import ua.beengoo.logdo2.plugin.util.TokenCrypto;
 import ua.beengoo.logdo2.plugin.web.LoginEndpoint;
+import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -34,6 +35,7 @@ public final class LogDO2 extends JavaPlugin {
     private JDA jda;
     private LoginEndpoint loginEndpoint;
     private TimeoutManager timeouts;
+    private AuditLogger audit;
 
     // Ports/adapters
     private OAuthPort oauthPort;
@@ -79,6 +81,7 @@ public final class LogDO2 extends JavaPlugin {
         int javaLimit    = getConfig().getInt("limits.perDiscord.java", 1);
         int bedrockLimit = getConfig().getInt("limits.perDiscord.bedrock", 1);
         boolean includeReserved = getConfig().getBoolean("limits.perDiscord.includeReserved", false);
+        boolean disallowSimultaneousPlay = getConfig().getBoolean("limits.perDiscord.disallowSimultaneousPlay", false);
 
         // DB → migrations
         this.db = new DatabaseManager(this);
@@ -119,7 +122,8 @@ public final class LogDO2 extends JavaPlugin {
                 messages,
                 javaLimit,
                 bedrockLimit,
-                includeReserved
+                includeReserved,
+                disallowSimultaneousPlay
         );
 
 
@@ -130,8 +134,8 @@ public final class LogDO2 extends JavaPlugin {
                         GatewayIntent.DIRECT_MESSAGES
                 )
                 .addEventListeners(
-                        new JdaSlashLoginListener(loginService, getLogger(), messages),
-                        new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger()),
+                        new JdaSlashLoginListener(loginService, getLogger(), messages, audit),
+                        new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger(), audit),
                         new ListenerAdapter() {
                             @Override public void onReady(ReadyEvent event) {
                                 SlashCommandRegistrar.register(jda);
@@ -145,19 +149,44 @@ public final class LogDO2 extends JavaPlugin {
         this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, this);
         this.loginService.setDiscordDmPort(discordDmPort);
 
+        // Audit
+        boolean auditEnabled = getConfig().getBoolean("audit.enabled", true);
+        String auditFile = getConfig().getString("audit.file", "logdo2-actions.log");
+        if (auditEnabled) {
+            try {
+                this.audit = new AuditLogger(this, auditFile);
+            } catch (Exception e) {
+                getLogger().warning("Failed to open audit log: " + e.getMessage());
+            }
+        } else {
+            this.audit = null;
+        }
+
         // Web
-        this.loginEndpoint = new LoginEndpoint(getLogger(), loginService);
+        String postAction = getConfig().getString("postLogin.action", "text");
+        String postText = getConfig().getString("postLogin.text", "Discord account linked. You can return to the game.");
+        String redirectUrlCfg = getConfig().getString("postLogin.redirectUrl", "");
+        String targetGuildId = getConfig().getString("discord.targetGuildId", "");
+        String inviteChannelId = getConfig().getString("discord.inviteChannelId", "");
+
+        this.loginEndpoint = new LoginEndpoint(
+                getLogger(), loginService,
+                jda,
+                postAction, postText, redirectUrlCfg,
+                targetGuildId, inviteChannelId,
+                audit
+        );
         this.loginEndpoint.start(webPort);
 
-        LogDO2Command cmd = new LogDO2Command(loginService, accountsRepo, profileRepo, banProgressRepo, messages);
+        LogDO2Command cmd = new LogDO2Command(loginService, accountsRepo, profileRepo, banProgressRepo, messages, audit);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 
         // Bukkit listeners & timeouts
         this.floodgate = new FloodgateHook();
         if (floodgate.isPresent()) getLogger().info("[LogDO2] Floodgate detected. Bedrock support enabled.");
-        Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages), this);
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this), this);
+        Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages, audit), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this, audit), this);
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,
                 Duration.ofSeconds(loginSec),
@@ -174,6 +203,7 @@ public final class LogDO2 extends JavaPlugin {
         if (loginEndpoint != null) loginEndpoint.stop();
         if (jda != null) jda.shutdownNow();
         if (db != null) db.stop();
+        if (audit != null) try { audit.close(); } catch (Exception ignored) {}
         getLogger().info("LogDO2 disabled.");
     }
 

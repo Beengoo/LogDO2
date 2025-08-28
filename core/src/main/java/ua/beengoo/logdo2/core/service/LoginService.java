@@ -36,6 +36,7 @@ public class LoginService {
     private final int javaLimitPerDiscord;
     private final int bedrockLimitPerDiscord;
     private final boolean limitIncludeReserved;
+    private final boolean disallowSimultaneousPlay;
 
     public LoginService(OAuthPort oauth, DiscordDmPort dm,
                         AccountsRepo accounts, ProfileRepo profiles, TokensRepo tokens,
@@ -51,7 +52,8 @@ public class LoginService {
                         MessagesPort messages,
                         int javaLimitPerDiscord,
                         int bedrockLimitPerDiscord,
-                        boolean limitIncludeReserved) {
+                        boolean limitIncludeReserved,
+                        boolean disallowSimultaneousPlay) {
         this.oauth = oauth;
         this.dm = dm;
         this.accounts = accounts;
@@ -78,6 +80,7 @@ public class LoginService {
         this.javaLimitPerDiscord = Math.max(0, javaLimitPerDiscord);
         this.bedrockLimitPerDiscord = Math.max(0, bedrockLimitPerDiscord);
         this.limitIncludeReserved = limitIncludeReserved;
+        this.disallowSimultaneousPlay = disallowSimultaneousPlay;
     }
 
     public void setDiscordDmPort(DiscordDmPort dm) { this.dm = dm; }
@@ -124,6 +127,8 @@ public class LoginService {
             showIpConfirmPhaseTitle(uuid);
             return;
         }
+
+        // Simultaneous-play prevention is handled earlier at PlayerLoginEvent to be Folia-safe
 
         sendActionBar(uuid, msg.mc("login.linked.actionbar"));
     }
@@ -321,7 +326,43 @@ public class LoginService {
     }
 
     private void kick(UUID uuid, String reason) {
-        runPlayer(uuid, p -> p.kickPlayer(reason));
+        // Folia-safe: perform kick on player's region thread with a 1-tick delay
+        try {
+            Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) {
+                    try {
+                        p.getScheduler().execute(plugin, () -> p.kickPlayer(reason), null, 1L);
+                    } catch (Throwable ignored) {
+                        // Non-Folia Paper path: kick immediately
+                        p.kickPlayer(reason);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+            // Legacy Bukkit fallback: schedule 1 tick later
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) p.kickPlayer(reason);
+            }, 1L);
+        }
+    }
+
+    // Check at login time whether the player should be disallowed (e.g., simultaneous play)
+    public Optional<String> disallowReasonOnLogin(UUID uuid, String name, String currentIp, boolean bedrock) {
+        if (!disallowSimultaneousPlay) return Optional.empty();
+        var owner = accounts.findDiscordForProfile(uuid);
+        if (owner.isEmpty()) return Optional.empty();
+        long discordId = owner.get();
+        for (org.bukkit.entity.Player other : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (other.getUniqueId().equals(uuid)) continue;
+            var otherOwner = accounts.findDiscordForProfile(other.getUniqueId());
+            if (otherOwner.isPresent() && otherOwner.get() == discordId) {
+                java.util.Map<String, String> ph = java.util.Map.of("other", other.getName());
+                return Optional.of(msg.mc("limits.simultaneous_kick", ph));
+            }
+        }
+        return Optional.empty();
     }
 
     private void runMain(Runnable r) {

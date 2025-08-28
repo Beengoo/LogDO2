@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
+import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.util.Optional;
 
@@ -19,15 +20,33 @@ public class PlayerListener implements Listener {
     private final FloodgateHook floodgate;
     private final LoginStatePort state;
     private final Plugin plugin;
+    private final AuditLogger audit;
+    private final java.util.Map<java.util.UUID, Phase> lastPhase = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public PlayerListener(LoginService loginService, FloodgateHook floodgate, LoginStatePort state, Plugin plugin) {
+    public PlayerListener(LoginService loginService, FloodgateHook floodgate, LoginStatePort state, Plugin plugin, AuditLogger audit) {
         this.loginService = loginService;
         this.floodgate = floodgate;
         this.state = state;
         this.plugin = plugin;
+        this.audit = audit;
     }
 
     // === ENTRY POINT ===
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onLogin(PlayerLoginEvent e) {
+        Player p = e.getPlayer();
+        String ip = Optional.ofNullable(e.getAddress()).map(a -> a.getHostAddress()).orElse("unknown");
+        boolean bedrock = isBedrock(p);
+        if (audit != null) audit.log("minecraft", "player_login_attempt", java.util.Map.of(
+                "name", p.getName(),
+                "uuid", p.getUniqueId().toString(),
+                "ip", ip,
+                "bedrock", String.valueOf(bedrock)
+        ));
+        loginService.disallowReasonOnLogin(p.getUniqueId(), p.getName(), ip, bedrock)
+                .ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, reason));
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
@@ -35,6 +54,12 @@ public class PlayerListener implements Listener {
         loginService.onPlayerJoin(p.getUniqueId(), p.getName(), ip, isBedrock(p));
         // Apply visuals for current phase if any
         refreshVisuals(p);
+        if (audit != null) audit.log("minecraft", "player_join", java.util.Map.of(
+                "name", p.getName(),
+                "uuid", p.getUniqueId().toString(),
+                "ip", ip,
+                "bedrock", String.valueOf(isBedrock(p))
+        ));
     }
 
     // === BLOCKERS ===
@@ -91,6 +116,7 @@ public class PlayerListener implements Listener {
 
         // Determine phase
         Phase phase = getPhase(p);
+        logPhaseIfChanged(p, phase);
         if (phase == null) return true;
 
         String base = (phase == Phase.LOGIN) ? "gates.login." : "gates.ipConfirm.";
@@ -120,6 +146,7 @@ public class PlayerListener implements Listener {
         if (loginService.isActionAllowed(p.getUniqueId(), ip)) return true;
 
         Phase phase = getPhase(p);
+        logPhaseIfChanged(p, phase);
         if (phase == null) return true;
 
         String base = (phase == Phase.LOGIN) ? "gates.login." : "gates.ipConfirm.";
@@ -163,6 +190,7 @@ public class PlayerListener implements Listener {
         String ip = getIp(p);
         boolean fullyAllowed = loginService.isActionAllowed(p.getUniqueId(), ip);
         Phase phase = getPhase(p);
+        logPhaseIfChanged(p, phase);
         if (fullyAllowed || phase == null) {
             clearVisuals(p);
             return;
@@ -172,6 +200,27 @@ public class PlayerListener implements Listener {
         boolean hide = plugin.getConfig().getBoolean(base + "hidePlayers", false);
         if (blind) applyBlindness(p); else clearBlindness(p);
         if (hide) hideOthers(p); else showOthers(p);
+    }
+
+    private void logPhaseIfChanged(Player p, Phase phase) {
+        java.util.UUID id = p.getUniqueId();
+        Phase prev;
+        if (phase == null) {
+            prev = lastPhase.remove(id);
+        } else {
+            prev = lastPhase.put(id, phase);
+        }
+        if (audit == null) return;
+        if (prev != phase) {
+            String prevStr = prev == null ? "NONE" : prev.name();
+            String newStr  = phase == null ? "NONE" : phase.name();
+            audit.log("minecraft", "phase_change", java.util.Map.of(
+                    "uuid", p.getUniqueId().toString(),
+                    "name", p.getName(),
+                    "prev", prevStr,
+                    "next", newStr
+            ));
+        }
     }
 
     private void applyBlindness(Player p) {

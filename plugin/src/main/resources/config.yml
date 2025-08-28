@@ -4,6 +4,9 @@ web:
 
 discord:
   botToken: "YOUR_BOT_TOKEN"
+  # Used when postLogin.action == discord-invite
+  targetGuildId: ""
+  inviteChannelId: ""
 
 oauth:
   clientId: "DISCORD_OAUTH_CLIENT_ID"
@@ -47,11 +50,25 @@ timeouts:
   loginSeconds: 300
   ipConfirmSeconds: 180
 
+audit:
+  enabled: true
+  file: "logdo2-actions.log"  # relative to server root
+
 limits:
   perDiscord:
     java: 1
     bedrock: 1
     includeReserved: false
+    disallowSimultaneousPlay: false
+
+# What to show/do in the browser after successful OAuth login
+postLogin:
+  # one of: text, discord-invite, redirect
+  action: text
+  # Used when action == text
+  text: "Discord account linked. You can return to the game."
+  # Used when action == redirect
+  redirectUrl: ""
 
 gates:
   # What actions are allowed during the first login (before OAuth)

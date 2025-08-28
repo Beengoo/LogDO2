@@ -19,12 +19,14 @@ public class JdaDiscordButtonListener extends ListenerAdapter {
     private final ProfileRepo profileRepo;
     private final MessagesPort msg;
     private final Logger log;
+    private final ua.beengoo.logdo2.plugin.util.AuditLogger audit;
 
-    public JdaDiscordButtonListener(LoginService loginService, ProfileRepo profileRepo, MessagesPort msg, Logger log) {
+    public JdaDiscordButtonListener(LoginService loginService, ProfileRepo profileRepo, MessagesPort msg, Logger log, ua.beengoo.logdo2.plugin.util.AuditLogger audit) {
         this.loginService = loginService;
         this.profileRepo = profileRepo;
         this.msg = msg;
         this.log = log;
+        this.audit = audit;
     }
 
     @Override
@@ -47,10 +49,18 @@ public class JdaDiscordButtonListener extends ListenerAdapter {
             switch (action) {
                 case "accept" -> {
                     loginService.onDiscordIpConfirm(uuid, discordId);
+                    if (audit != null) audit.log("discord", "ip_confirm_accept", java.util.Map.of(
+                            "discord", String.valueOf(discordId),
+                            "player", uuid.toString()
+                    ));
                     updateEmbed(event, playerName, uuid, true);
                 }
                 case "reject" -> {
                     loginService.onDiscordIpReject(uuid, discordId);
+                    if (audit != null) audit.log("discord", "ip_confirm_reject", java.util.Map.of(
+                            "discord", String.valueOf(discordId),
+                            "player", uuid.toString()
+                    ));
                     updateEmbed(event, playerName, uuid, false);
                 }
                 default -> {}

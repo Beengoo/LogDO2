@@ -6,6 +6,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import ua.beengoo.logdo2.api.ports.BanProgressRepo;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
+import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,11 +16,13 @@ public class PreLoginListener implements Listener {
     private final BanProgressRepo bans;
     private final Logger log;
     private final YamlMessages msg;
+    private final AuditLogger audit;
 
-    public PreLoginListener(BanProgressRepo bans, Logger log, YamlMessages msg) {
+    public PreLoginListener(BanProgressRepo bans, Logger log, YamlMessages msg, AuditLogger audit) {
         this.bans = bans;
         this.log = log;
         this.msg = msg;
+        this.audit = audit;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -41,6 +44,10 @@ public class PreLoginListener implements Listener {
 
         event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, kickMsg);
         log.info("[LogDO2] Blocked banned IP " + ip + " (" + event.getUniqueId() + "): " + kickMsg);
+        if (audit != null) audit.log("minecraft", "prelogin_blocked_banned", java.util.Map.of(
+                "ip", ip,
+                "uuid", event.getUniqueId().toString()
+        ));
     }
 
     private static String humanDuration(long seconds) {

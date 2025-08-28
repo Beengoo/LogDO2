@@ -24,17 +24,20 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
     private final ProfileRepo profileRepo;
     private final BanProgressRepo banProgressRepo;
     private final MessagesPort msg;
+    private final ua.beengoo.logdo2.plugin.util.AuditLogger audit;
 
     public LogDO2Command(LoginService loginService,
                          AccountsRepo accountsRepo,
                          ProfileRepo profileRepo,
                          BanProgressRepo banProgressRepo,
-                         MessagesPort msg) {
+                         MessagesPort msg,
+                         ua.beengoo.logdo2.plugin.util.AuditLogger audit) {
         this.loginService = loginService;
         this.accountsRepo = accountsRepo;
         this.profileRepo = profileRepo;
         this.banProgressRepo = banProgressRepo;
         this.msg = msg;
+        this.audit = audit;
     }
 
     @Override
@@ -52,6 +55,12 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             case "forgive" -> handleForgive(sender, args);
             case "reload"  -> handleReload(sender);
             default        -> sendHelp(sender);
+        }
+        if (audit != null) {
+            java.util.Map<String, String> f = new java.util.LinkedHashMap<>();
+            f.put("sender", sender.getName());
+            f.put("sub", args[0].toLowerCase());
+            audit.log("admin", "command", f);
         }
         return true;
     }
@@ -83,6 +92,11 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         }
         accountsRepo.reserve(discordId, puuid);
         sender.sendMessage("§aReserved profile " + puuid + " for Discord " + discordId + ". Player must authenticate via OAuth.");
+        if (audit != null) audit.log("admin", "link_reserve", java.util.Map.of(
+                "sender", sender.getName(),
+                "player", puuid.toString(),
+                "discord", String.valueOf(discordId)
+        ));
     }
 
     private void handleLogout(CommandSender sender, String[] args) {
@@ -97,6 +111,11 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             accountsRepo.unlinkByDiscordAndProfile(discordId, uuid);
             kickIfOnline(uuid, msg.mc("admin.logout_kick"));
             sender.sendMessage("§aUnlinked Discord " + discordId + " from player " + uuid + ".");
+            if (audit != null) audit.log("admin", "logout_pair", java.util.Map.of(
+                    "sender", sender.getName(),
+                    "discord", String.valueOf(discordId),
+                    "player", uuid.toString()
+            ));
             return;
         }
 
@@ -109,6 +128,10 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             accountsRepo.unlinkByProfile(uuidByName);
             kickIfOnline(uuidByName, msg.mc("admin.logout_kick"));
             sender.sendMessage("§aUnlinked player §e" + target + " §7(" + uuidByName + ")");
+            if (audit != null) audit.log("admin", "logout_profile", java.util.Map.of(
+                    "sender", sender.getName(),
+                    "player", uuidByName.toString()
+            ));
             return;
         }
 
@@ -118,6 +141,10 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             accountsRepo.unlinkByProfile(puuid);
             kickIfOnline(puuid, msg.mc("admin.logout_kick"));
             sender.sendMessage("§aUnlinked player " + puuid + ".");
+            if (audit != null) audit.log("admin", "logout_profile", java.util.Map.of(
+                    "sender", sender.getName(),
+                    "player", puuid.toString()
+            ));
             return;
         } catch (IllegalArgumentException ignore) { }
 
@@ -128,6 +155,10 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             for (UUID u : accountsRepo.findProfilesForDiscord(did)) kickIfOnline(u, msg.mc("admin.logout_kick"));
             accountsRepo.unlinkByDiscord(did);
             sender.sendMessage("§aUnlinked all players for Discord " + did + ".");
+            if (audit != null) audit.log("admin", "logout_discord", java.util.Map.of(
+                    "sender", sender.getName(),
+                    "discord", String.valueOf(did)
+            ));
             return;
         }
 
@@ -155,6 +186,10 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         }
         banProgressRepo.reset(ip);
         sender.sendMessage("§aForgave (cleared ban progress) for IP: §e" + ip);
+        if (audit != null) audit.log("admin", "forgive_ip", java.util.Map.of(
+                "sender", sender.getName(),
+                "ip", ip
+        ));
     }
 
     private void handleReload(CommandSender sender) {
@@ -166,6 +201,9 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         }
         if (msg instanceof ua.beengoo.logdo2.plugin.i18n.YamlMessages ym) ym.reload();
         sender.sendMessage("§aLogDO2 configuration reloaded!");
+        if (audit != null) audit.log("admin", "reload", java.util.Map.of(
+                "sender", sender.getName()
+        ));
     }
 
     // ==== utils ====

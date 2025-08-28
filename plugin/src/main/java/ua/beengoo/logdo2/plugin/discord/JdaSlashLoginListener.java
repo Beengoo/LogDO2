@@ -12,11 +12,13 @@ public class JdaSlashLoginListener extends ListenerAdapter {
     private final LoginService loginService;
     private final Logger log;
     private final MessagesPort msg;
+    private final ua.beengoo.logdo2.plugin.util.AuditLogger audit;
 
-    public JdaSlashLoginListener(LoginService loginService, Logger log, MessagesPort msg) {
+    public JdaSlashLoginListener(LoginService loginService, Logger log, MessagesPort msg, ua.beengoo.logdo2.plugin.util.AuditLogger audit) {
         this.loginService = loginService;
         this.log = log;
         this.msg = msg;
+        this.audit = audit;
     }
 
     @Override
@@ -36,6 +38,10 @@ public class JdaSlashLoginListener extends ListenerAdapter {
         } catch (Exception e) {
             log.warning("Slash /login error: " + e.getMessage());
         }
+        if (audit != null) audit.log("discord", "slash_login", java.util.Map.of(
+                "discord", String.valueOf(did),
+                "ok", String.valueOf(ok)
+        ));
         if (ok) event.reply(msg.raw("discord.slash_login_ok")).setEphemeral(true).queue();
         else    event.reply(msg.raw("discord.slash_login_invalid")).setEphemeral(true).queue();
     }

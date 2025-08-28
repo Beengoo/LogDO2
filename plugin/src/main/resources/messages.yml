@@ -47,3 +47,6 @@ discord:
 
 admin:
   logout_kick: "&cYou have been logged out by an admin. Please rejoin to link again."
+
+limits:
+  simultaneous_kick: "&cAnother profile linked to your Discord is already online: {other}"
