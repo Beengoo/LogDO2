@@ -102,18 +102,12 @@ public class LoginService {
             if (bedrock) {
                 String code = state.createOneTimeCode(uuid, currentIp, name);
                 Map<String, String> ph = Map.of("code", code);
-                sendTitle(uuid,
-                        msg.mc("login.first_join.title"),
-                        msg.mc("login.first_join.subtitle"),
-                        10, 80, 10);
+                showLoginPhaseTitle(uuid);
                 sendBedrockHint(uuid, msg.mc("login.bedrock.code_hint", ph));
             } else {
                 String token = state.createOAuthState(uuid, currentIp, name, false);
                 String loginUrl = publicUrl + "/login?state=" + token;
-                sendTitle(uuid,
-                        msg.mc("login.first_join.title"),
-                        msg.mc("login.first_join.subtitle"),
-                        10, 80, 10);
+                showLoginPhaseTitle(uuid);
                 sendClickableAuth(uuid,
                         msg.mc("chat.auth_link_text"),
                         msg.mc("chat.auth_link_hover"),
@@ -127,7 +121,7 @@ public class LoginService {
             long discordId = accounts.findDiscordForProfile(uuid).orElseThrow();
             state.markPendingIpConfirm(uuid, currentIp, discordId);
             if (dm != null) dm.sendIpConfirmDm(discordId, uuid, name, currentIp);
-            sendTitle(uuid, msg.mc("ip.unconfirmed.title"), msg.mc("ip.unconfirmed.subtitle"), 10, 80, 10);
+            showIpConfirmPhaseTitle(uuid);
             return;
         }
 
@@ -192,6 +186,7 @@ public class LoginService {
         sendActionBar(st.uuid(), msg.mc("oauth.linked_actionbar", ph));
         if (dm != null) dm.sendFirstLoginDm(user.id(), st.uuid(), st.name(), publicUrl);
         state.clearPendingLogin(st.uuid());
+        clearPhaseTitle(st.uuid());
     }
 
     public void onDiscordIpConfirm(UUID profileUuid, long discordUserId) {
@@ -205,6 +200,7 @@ public class LoginService {
 
         profiles.updateLastConfirmedIp(profileUuid, pending.newIp());
         sendActionBar(profileUuid, msg.mc("ip.confirm_actionbar"));
+        clearPhaseTitle(profileUuid);
     }
 
     public void onDiscordIpReject(UUID profileUuid, long discordUserId) {
@@ -306,6 +302,24 @@ public class LoginService {
         runMain(() -> {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) p.sendTitle(title, subtitle, in, stay, out);
+        });
+    }
+
+    public void showLoginPhaseTitle(UUID uuid) {
+        sendTitle(uuid, msg.mc("login.first_join.title"), msg.mc("login.first_join.subtitle"), 0, 5000, 0);
+    }
+
+    public void showIpConfirmPhaseTitle(UUID uuid) {
+        sendTitle(uuid, msg.mc("ip.unconfirmed.title"), msg.mc("ip.unconfirmed.subtitle"), 0, 5000, 0);
+    }
+
+    public void clearPhaseTitle(UUID uuid) {
+        runMain(() -> {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) {
+                try { p.clearTitle(); } catch (Throwable ignored) { /* older API fallback */ }
+                try { p.resetTitle(); } catch (Throwable ignored) { /* older API fallback */ }
+            }
         });
     }
 
