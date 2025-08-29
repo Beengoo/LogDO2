@@ -43,8 +43,14 @@ public class PlayerListener implements Listener {
                 "ip", ip,
                 "bedrock", String.valueOf(bedrock)
         ));
-        loginService.disallowReasonOnLogin(p.getUniqueId(), p.getName(), ip, bedrock)
-                .ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, reason));
+        var reasonOpt = loginService.disallowReasonOnLogin(p.getUniqueId(), p.getName(), ip, bedrock);
+        boolean allowed = reasonOpt.isEmpty();
+        try {
+            org.bukkit.Bukkit.getPluginManager().callEvent(
+                    new ua.beengoo.logdo2.api.events.PlayerPostLoginCheckEvent(p, ip, bedrock, allowed, reasonOpt.orElse(null))
+            );
+        } catch (Throwable ignored) {}
+        reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, reason));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -112,7 +118,14 @@ public class PlayerListener implements Listener {
     private boolean isAllowed(Player p, Action action) {
         // If fully allowed by service (i.e., not pending states), no gating applies
         String ip = getIp(p);
-        if (loginService.isActionAllowed(p.getUniqueId(), ip)) return true;
+        boolean coreAllowed = loginService.isActionAllowed(p.getUniqueId(), ip);
+        // Notify listeners about the check (notify-only; decision stays as coreAllowed)
+        try {
+            org.bukkit.Bukkit.getPluginManager().callEvent(
+                    new ua.beengoo.logdo2.api.events.PlayerIpCheckEvent(p, ip, coreAllowed)
+            );
+        } catch (Throwable ignored) {}
+        if (coreAllowed) return true;
 
         // Determine phase
         Phase phase = getPhase(p);

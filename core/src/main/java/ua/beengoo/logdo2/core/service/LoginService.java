@@ -27,6 +27,7 @@ public class LoginService {
     private final String redirectUri;
     private final Plugin plugin;
     private final MessagesPort msg;
+    private IpPolicyPort ipPolicy; // optional, provided by other plugins via Services
 
     private final BanProgressRepo banProgressRepo;
     private final boolean bansEnabled;
@@ -84,6 +85,7 @@ public class LoginService {
     }
 
     public void setDiscordDmPort(DiscordDmPort dm) { this.dm = dm; }
+    public void setIpPolicyPort(IpPolicyPort ipPolicy) { this.ipPolicy = ipPolicy; }
 
     // === Join flow ===
     public void onPlayerJoin(UUID uuid, String name, String currentIp, boolean bedrock) {
@@ -107,6 +109,7 @@ public class LoginService {
                 Map<String, String> ph = Map.of("code", code);
                 showLoginPhaseTitle(uuid);
                 sendBedrockHint(uuid, msg.mc("login.bedrock.code_hint", ph));
+                firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
             } else {
                 String token = state.createOAuthState(uuid, currentIp, name, false);
                 String loginUrl = publicUrl + "/login?state=" + token;
@@ -115,6 +118,7 @@ public class LoginService {
                         msg.mc("chat.auth_link_text"),
                         msg.mc("chat.auth_link_hover"),
                         loginUrl);
+                firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
             }
             return;
         }
@@ -125,6 +129,7 @@ public class LoginService {
             state.markPendingIpConfirm(uuid, currentIp, discordId);
             if (dm != null) dm.sendIpConfirmDm(discordId, uuid, name, currentIp);
             showIpConfirmPhaseTitle(uuid);
+            firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
             return;
         }
 
@@ -138,6 +143,14 @@ public class LoginService {
         if (state.isPendingLogin(uuid)) return false;
         if (state.isPendingIpConfirm(uuid)) return false;
         String last = profiles.findLastConfirmedIp(uuid).orElse(null);
+        if (ipPolicy != null && last != null) {
+            try {
+                return ipPolicy.allow(currentIp, last);
+            } catch (Throwable t) {
+                // fallback to strict equality on errors
+                return Objects.equals(last, currentIp);
+            }
+        }
         return Objects.equals(last, currentIp);
     }
 
@@ -196,6 +209,7 @@ public class LoginService {
         if (dm != null) dm.sendFirstLoginDm(user.id(), st.uuid(), st.name(), publicUrl);
         state.clearPendingLogin(st.uuid());
         clearPhaseTitle(st.uuid());
+        firePhaseExit(st.uuid(), ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
     }
 
     public void onDiscordIpConfirm(UUID profileUuid, long discordUserId) {
@@ -210,6 +224,15 @@ public class LoginService {
         profiles.updateLastConfirmedIp(profileUuid, pending.newIp());
         sendActionBar(profileUuid, msg.mc("ip.confirm_actionbar"));
         clearPhaseTitle(profileUuid);
+
+        // Fire Bukkit event for integrations (main thread, only if player online)
+        runPlayer(profileUuid, p -> {
+            try {
+                org.bukkit.Bukkit.getPluginManager()
+                        .callEvent(new ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent(p, pending.newIp()));
+            } catch (Throwable ignored) {}
+        });
+        firePhaseExit(profileUuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
     }
 
     public void onDiscordIpReject(UUID profileUuid, long discordUserId) {
@@ -225,6 +248,7 @@ public class LoginService {
         Map<String, String> ph = Map.of("duration", humanDuration(durSec));
         sendActionBar(profileUuid, msg.mc("ip.reject_actionbar", ph));
         kick(profileUuid, msg.mc("ip.reject_kick", ph));
+        firePhaseExit(profileUuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
     }
 
     public boolean onDiscordSlashLogin(String code, long discordUserId) {
@@ -253,11 +277,13 @@ public class LoginService {
     public void onLoginTimeout(UUID uuid) {
         state.clearPendingLogin(uuid);
         kick(uuid, msg.mc("timeouts.login_kick"));
+        firePhaseExit(uuid, ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
     }
 
     public void onIpConfirmTimeout(UUID uuid) {
         state.consumePendingIpConfirm(uuid);
         kick(uuid, msg.mc("timeouts.ip_kick"));
+        firePhaseExit(uuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
     }
 
     // === Progressive bans (only ban_progress table) ===
@@ -410,6 +436,24 @@ public class LoginService {
                 if (p != null) action.accept(p);
             });
         }
+    }
+
+    private void firePhaseEnter(UUID uuid, ua.beengoo.logdo2.api.events.LoginPhase phase) {
+        runPlayer(uuid, p -> {
+            try {
+                org.bukkit.Bukkit.getPluginManager()
+                        .callEvent(new ua.beengoo.logdo2.api.events.PlayerLoginPhaseEnterEvent(p, phase));
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    private void firePhaseExit(UUID uuid, ua.beengoo.logdo2.api.events.LoginPhase phase) {
+        runPlayer(uuid, p -> {
+            try {
+                org.bukkit.Bukkit.getPluginManager()
+                        .callEvent(new ua.beengoo.logdo2.api.events.PlayerLoginPhaseExitEvent(p, phase));
+            } catch (Throwable ignored) {}
+        });
     }
 
     private static String humanDuration(long seconds) {

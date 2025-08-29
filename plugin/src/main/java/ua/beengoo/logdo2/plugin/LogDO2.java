@@ -6,8 +6,10 @@ import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
+import ua.beengoo.logdo2.api.LogDO2Api;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.LoginStateService;
@@ -27,6 +29,9 @@ import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
 import ua.beengoo.logdo2.plugin.util.TokenCrypto;
 import ua.beengoo.logdo2.plugin.web.LoginEndpoint;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
+import ua.beengoo.logdo2.plugin.adapters.api.AccountsReadAdapter;
+import ua.beengoo.logdo2.plugin.adapters.api.LogDO2ApiImpl;
+import ua.beengoo.logdo2.plugin.adapters.api.ProfileReadAdapter;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -104,9 +109,14 @@ public final class LogDO2 extends JavaPlugin {
         this.banProgressRepo = new JdbcBanProgressRepo(db.dataSource(), db.dialect());
         this.loginStatePort  = new LoginStateService();
 
-        // OAuth
+        // OAuth (allow external override via ServicesManager)
         String redirectUri = publicUrl + "/oauth/callback";
-        this.oauthPort = new DiscordOAuthAdapter(getLogger(), clientId, clientSecret, scopes);
+        this.oauthPort = getServer().getServicesManager().load(OAuthPort.class);
+        if (this.oauthPort == null) {
+            this.oauthPort = new DiscordOAuthAdapter(getLogger(), clientId, clientSecret, scopes);
+        } else {
+            getLogger().info("[LogDO2] Using external OAuthPort provider.");
+        }
 
         // Core
         this.loginService = new LoginService(
@@ -139,15 +149,28 @@ public final class LogDO2 extends JavaPlugin {
                         new ListenerAdapter() {
                             @Override public void onReady(ReadyEvent event) {
                                 SlashCommandRegistrar.register(jda);
-                                discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, LogDO2.this);
-                                loginService.setDiscordDmPort(discordDmPort);
-                                getLogger().info("[LogDO2] JDA is READY. DM adapter installed.");
+                                // Install default DM adapter only if no external provider was set earlier
+                                if (discordDmPort == null) {
+                                    discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, LogDO2.this);
+                                    loginService.setDiscordDmPort(discordDmPort);
+                                    getLogger().info("[LogDO2] JDA is READY. DM adapter installed.");
+                                } else {
+                                    getLogger().info("[LogDO2] JDA is READY. External DM adapter in use.");
+                                }
                             }
                         }
                 ).build();
 
-        this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, this);
-        this.loginService.setDiscordDmPort(discordDmPort);
+        // Discord DM adapter (prefer external provider if present)
+        DiscordDmPort externalDm = getServer().getServicesManager().load(DiscordDmPort.class);
+        if (externalDm != null) {
+            this.discordDmPort = externalDm;
+            this.loginService.setDiscordDmPort(discordDmPort);
+            getLogger().info("[LogDO2] Using external DiscordDmPort provider.");
+        } else {
+            this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, this);
+            this.loginService.setDiscordDmPort(discordDmPort);
+        }
 
         // Audit
         boolean auditEnabled = getConfig().getBoolean("audit.enabled", true);
@@ -193,6 +216,19 @@ public final class LogDO2 extends JavaPlugin {
                 Duration.ofSeconds(ipConfSec)
         );
         this.timeouts.start();
+
+        // Optional policy provider
+        IpPolicyPort ipPolicy = getServer().getServicesManager().load(IpPolicyPort.class);
+        if (ipPolicy != null) {
+            loginService.setIpPolicyPort(ipPolicy);
+            getLogger().info("[LogDO2] IpPolicyPort provider installed.");
+        }
+
+        // Register public services for integrations (read-only)
+        var sm = getServer().getServicesManager();
+        sm.register(ProfileReadPort.class, new ProfileReadAdapter(profileRepo), this, ServicePriority.Normal);
+        sm.register(ua.beengoo.logdo2.api.ports.AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
+        sm.register(LogDO2Api.class, new LogDO2ApiImpl(loginService, profileRepo, accountsRepo), this, ServicePriority.Normal);
 
         getLogger().info("LogDO2 enabled with DB " + db.dialect());
     }
