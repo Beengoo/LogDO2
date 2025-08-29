@@ -1,2 +1,2 @@
 rootProject.name = 'LogDO2'
-include("api", "core", "plugin")
+include("logdo2-api", "core", "plugin")
