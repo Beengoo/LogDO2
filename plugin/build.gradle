@@ -26,12 +26,13 @@ dependencies {
 
 tasks {
     runServer { minecraftVersion("1.21.6") }
+
     shadowJar {
-        // Name final jar as root project name + version, no classifier
         archiveClassifier.set("")
-        archiveBaseName.set(rootProject.name)
+        archiveBaseName.set("LogDO2")
         archiveVersion.set(rootProject.version as String)
     }
+
     build { dependsOn(shadowJar) }
 }
 
