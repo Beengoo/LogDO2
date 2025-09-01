@@ -17,6 +17,7 @@ public class LoginStateService implements LoginStatePort {
     private final Map<String, PendingCode> codes      = new ConcurrentHashMap<>();
     private final Map<UUID, PendingLogin> pendingLogin = new ConcurrentHashMap<>();
     private final Map<UUID, PendingIp> pendingIp = new ConcurrentHashMap<>();
+    private final Map<UUID, BedrockShown> bedrockShown = new ConcurrentHashMap<>();
     private final SecureRandom rnd = new SecureRandom();
 
     @Override
@@ -47,6 +48,8 @@ public class LoginStateService implements LoginStatePort {
             code = generateShortCode();
         } while (codes.containsKey(code));
         codes.put(code, new PendingCode(code, uuid, ip, name, Instant.now()));
+        // Remember what was shown last for potential resend
+        bedrockShown.put(uuid, new BedrockShown(code, Instant.now(), null));
         return code;
     }
 
@@ -89,11 +92,30 @@ public class LoginStateService implements LoginStatePort {
     @Override
     public void clearPendingLogin(UUID uuid) {
         pendingLogin.remove(uuid);
+        bedrockShown.remove(uuid);
     }
 
     @Override
     public Collection<PendingLogin> listPendingLogins() {
         return Collections.unmodifiableCollection(pendingLogin.values());
+    }
+
+    @Override
+    public void recordBedrockCodeShown(UUID uuid, String code) {
+        bedrockShown.compute(uuid, (u, prev) -> new BedrockShown(code, Instant.now(), prev == null ? null : prev.leftAt()));
+    }
+
+    @Override
+    public void recordBedrockLeave(UUID uuid) {
+        bedrockShown.compute(uuid, (u, prev) -> new BedrockShown(prev == null ? null : prev.code(), prev == null ? null : prev.shownAt(), Instant.now()));
+    }
+
+    @Override
+    public Optional<String> recentBedrockCodeAfterLeave(UUID uuid, Duration maxAge) {
+        var info = bedrockShown.get(uuid);
+        if (info == null || info.code() == null || info.leftAt() == null) return Optional.empty();
+        if (Instant.now().minus(maxAge).isAfter(info.leftAt())) return Optional.empty();
+        return Optional.of(info.code());
     }
 
     // ===== helpers =====
@@ -121,4 +143,6 @@ public class LoginStateService implements LoginStatePort {
         for (int i = 0; i < 6; i++) sb.append(alphabet.charAt(rnd.nextInt(alphabet.length())));
         return sb.toString();
     }
+
+    private record BedrockShown(String code, Instant shownAt, Instant leftAt) {}
 }

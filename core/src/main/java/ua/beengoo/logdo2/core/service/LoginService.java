@@ -105,7 +105,9 @@ public class LoginService {
         if (!accounts.isLinked(uuid)) {
             state.markPendingLogin(uuid, currentIp, bedrock);
             if (bedrock) {
-                String code = state.createOneTimeCode(uuid, currentIp, name);
+                String code = state.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(60))
+                        .orElseGet(() -> state.createOneTimeCode(uuid, currentIp, name));
+                state.recordBedrockCodeShown(uuid, code);
                 Map<String, String> ph = Map.of("code", code);
                 showLoginPhaseTitle(uuid);
                 sendBedrockHint(uuid, msg.mc("login.bedrock.code_hint", ph));

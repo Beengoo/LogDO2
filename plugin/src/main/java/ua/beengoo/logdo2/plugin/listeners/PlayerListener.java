@@ -68,6 +68,20 @@ public class PlayerListener implements Listener {
         ));
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(PlayerQuitEvent e) {
+        Player p = e.getPlayer();
+        try {
+            if (isBedrock(p) && state != null && state.isPendingLogin(p.getUniqueId())) {
+                state.recordBedrockLeave(p.getUniqueId());
+                if (audit != null) audit.log("minecraft", "player_quit_pending_login", java.util.Map.of(
+                        "name", p.getName(),
+                        "uuid", p.getUniqueId().toString()
+                ));
+            }
+        } catch (Throwable ignored) {}
+    }
+
     // === BLOCKERS ===
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onMove(PlayerMoveEvent e) {
