@@ -37,10 +37,31 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Run unit tests
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.ver }}
+        run: ./gradlew --no-daemon test -PreleaseVersion=${{ steps.vars.outputs.ver }} --stacktrace
+
+      - name: Upload JUnit XML results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml
+          path: |
+            **/build/test-results/test/*.xml
+
+      - name: Upload HTML test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-html
+          path: |
+            **/build/reports/tests/test/**
+
       - name: Build all modules with release version
         env:
           RELEASE_VERSION: ${{ steps.vars.outputs.ver }}
-        run: ./gradlew clean build -PreleaseVersion=${{ steps.vars.outputs.ver }} --stacktrace
+        run: ./gradlew --no-daemon clean build -x test -PreleaseVersion=${{ steps.vars.outputs.ver }} --stacktrace
 
       - name: Collect artifacts
         run: |
