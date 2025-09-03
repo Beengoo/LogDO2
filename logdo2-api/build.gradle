@@ -1,7 +1,9 @@
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
+group = 'ua.beengoo.logdo2'
 version = rootProject.version
 
 dependencies {
@@ -11,10 +13,50 @@ dependencies {
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
+    withSourcesJar()
+    withJavadocJar()
 }
 
 tasks.withType(Test).configureEach { useJUnitPlatform() }
 
 tasks.named('jar') {
     archiveBaseName.set('logdo2-api')
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = "logdo2-api"
+            pom {
+                name = "LogDO2 API"
+                description = "Public API for LogDO2 plugin."
+                url = "https://github.com/Pinecraft-Project/LogDO2"
+                licenses {
+                    license {
+                        name = "MIT License"
+                        url = "https://opensource.org/licenses/MIT"
+                    }
+                }
+                developers {
+                    developer {
+                        id = "beengoo"
+                        name = "Beengoo"
+                    }
+                }
+                scm {
+                    url = "https://github.com/Pinecraft-Project/LogDO2.git"
+                    connection = "scm:git:https://github.com/Pinecraft-Project/LogDO2.git"
+                    developerConnection = "scm:git:ssh://git@github.com/Pinecraft-Project/LogDO2.git"
+                }
+            }
+        }
+    }
+    repositories {
+        // Local staging; CI pushes this folder to gh-pages of maven-repo
+        maven {
+            name = "localGhPages"
+            url = layout.buildDirectory.dir("repo-staging")
+        }
+    }
 }

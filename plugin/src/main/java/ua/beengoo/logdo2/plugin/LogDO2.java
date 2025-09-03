@@ -8,7 +8,6 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.api.LogDO2Api;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.core.service.LoginService;

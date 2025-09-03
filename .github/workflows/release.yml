@@ -72,6 +72,22 @@ jobs:
           cp logdo2-api/build/libs/logdo2-api-*.jar dist/
           ls -la dist
 
+      - name: Publish logdo2-api to local staging (Maven)
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.ver }}
+        run: ./gradlew --no-daemon :logdo2-api:publish -PreleaseVersion=${{ steps.vars.outputs.ver }} --stacktrace
+
+      - name: Deploy to external Maven repo (main:/maven)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.MAVEN_REPO_TOKEN }}
+          external_repository: Pinecraft-Project/maven-repo
+          publish_branch: main
+          publish_dir: logdo2-api/build/repo-staging
+          destination_dir: maven
+          keep_files: true
+          commit_message: "Publish Maven repo ${{ steps.vars.outputs.ver }} to main:/maven from LogDO2"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
