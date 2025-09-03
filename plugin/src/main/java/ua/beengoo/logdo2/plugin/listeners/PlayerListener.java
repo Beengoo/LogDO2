@@ -72,12 +72,23 @@ public class PlayerListener implements Listener {
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();
         try {
-            if (isBedrock(p) && state != null && state.isPendingLogin(p.getUniqueId())) {
-                state.recordBedrockLeave(p.getUniqueId());
-                if (audit != null) audit.log("minecraft", "player_quit_pending_login", java.util.Map.of(
-                        "name", p.getName(),
-                        "uuid", p.getUniqueId().toString()
-                ));
+            if (state != null && state.isPendingLogin(p.getUniqueId())) {
+                if (isBedrock(p)) {
+                    state.recordBedrockLeave(p.getUniqueId());
+                    if (audit != null) audit.log("minecraft", "player_quit_pending_login", java.util.Map.of(
+                            "name", p.getName(),
+                            "uuid", p.getUniqueId().toString(),
+                            "bedrock", "true"
+                    ));
+                } else {
+                    // For Java players, clear pending login session immediately on leave
+                    state.clearPendingLogin(p.getUniqueId());
+                    if (audit != null) audit.log("minecraft", "player_quit_pending_login", java.util.Map.of(
+                            "name", p.getName(),
+                            "uuid", p.getUniqueId().toString(),
+                            "bedrock", "false"
+                    ));
+                }
             }
         } catch (Throwable ignored) {}
     }

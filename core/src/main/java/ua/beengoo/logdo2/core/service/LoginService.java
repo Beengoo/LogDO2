@@ -34,6 +34,7 @@ public class LoginService {
     private final long banBaseSec, banMaxSec, banTrackWindowSec;
     private final double banMultiplier;
     private final String banReasonTpl;
+    private final int bedrockCodeTimeAfterLeave;
     private final int javaLimitPerDiscord;
     private final int bedrockLimitPerDiscord;
     private final boolean limitIncludeReserved;
@@ -50,7 +51,7 @@ public class LoginService {
                         long banBaseSec, double banMultiplier,
                         long banMaxSec, long banTrackWindowSec,
                         String banReasonTpl,
-                        MessagesPort messages,
+                        MessagesPort messages, int bedrockCodeTimeAfterLeave,
                         int javaLimitPerDiscord,
                         int bedrockLimitPerDiscord,
                         boolean limitIncludeReserved,
@@ -77,6 +78,7 @@ public class LoginService {
         this.banReasonTpl = (banReasonTpl == null || banReasonTpl.isBlank())
                 ? "Suspicious login attempt. Ban: %DURATION%."
                 : banReasonTpl;
+        this.bedrockCodeTimeAfterLeave = bedrockCodeTimeAfterLeave;
 
         this.javaLimitPerDiscord = Math.max(0, javaLimitPerDiscord);
         this.bedrockLimitPerDiscord = Math.max(0, bedrockLimitPerDiscord);
@@ -105,7 +107,7 @@ public class LoginService {
         if (!accounts.isLinked(uuid)) {
             state.markPendingLogin(uuid, currentIp, bedrock);
             if (bedrock) {
-                String code = state.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(60))
+                String code = state.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(bedrockCodeTimeAfterLeave))
                         .orElseGet(() -> state.createOneTimeCode(uuid, currentIp, name));
                 state.recordBedrockCodeShown(uuid, code);
                 Map<String, String> ph = Map.of("code", code);

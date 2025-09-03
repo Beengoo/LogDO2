@@ -79,6 +79,7 @@ public final class LogDO2 extends JavaPlugin {
         long    baseSec     = getConfig().getLong("bans.baseSeconds", 1800L);
         double  mult        = getConfig().getDouble("bans.multiplier", 2.0);
         long    maxSec      = getConfig().getLong("bans.maxSeconds", 604800L);
+        int     bctal       = getConfig().getInt("platform.bedrockCodeTimeAfterLeave");
         long    windowSec   = getConfig().getLong("bans.trackWindowSeconds", 2592000L);
         String  reasonTpl   = getConfig().getString("bans.reasonTemplate", "Suspicious login attempt. Ban: %DURATION%.");
 
@@ -107,7 +108,7 @@ public final class LogDO2 extends JavaPlugin {
         this.tokensRepo      = new JdbcTokensRepo(db.dataSource(), crypto, db.dialect());
         this.discordUserRepo = new JdbcDiscordUserRepo(db.dataSource(), db.dialect());
         this.banProgressRepo = new JdbcBanProgressRepo(db.dataSource(), db.dialect());
-        this.loginStatePort  = new LoginStateService();
+        this.loginStatePort  = new LoginStateService(Duration.ofSeconds(bctal));
 
         // OAuth (allow external override via ServicesManager)
         String redirectUri = publicUrl + "/oauth/callback";
@@ -130,6 +131,7 @@ public final class LogDO2 extends JavaPlugin {
                 baseSec, mult, maxSec, windowSec,
                 reasonTpl,
                 messages,
+                bctal,
                 javaLimit,
                 bedrockLimit,
                 includeReserved,
@@ -213,7 +215,8 @@ public final class LogDO2 extends JavaPlugin {
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,
                 Duration.ofSeconds(loginSec),
-                Duration.ofSeconds(ipConfSec)
+                Duration.ofSeconds(ipConfSec),
+                Duration.ofSeconds(bctal)
         );
         this.timeouts.start();
 

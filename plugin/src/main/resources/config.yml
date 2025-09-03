@@ -50,6 +50,9 @@ timeouts:
   loginSeconds: 300
   ipConfirmSeconds: 180
 
+platform:
+  bedrockCodeTimeAfterLeave: 60
+
 audit:
   enabled: true
   file: "logdo2-actions.log"  # relative to server root

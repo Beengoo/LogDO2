@@ -19,6 +19,7 @@ public class TimeoutManager {
     private final LoginService service;
     private final Duration loginTtl;
     private final Duration ipTtl;
+    private final Duration bedrockReuseWindow;
 
     // Scheduling state
     private boolean folia; // true if Folia APIs are available
@@ -30,12 +31,14 @@ public class TimeoutManager {
     private final Map<UUID, Long> lastIpTitle = new ConcurrentHashMap<>();
 
     public TimeoutManager(Plugin plugin, LoginStatePort state, LoginService service,
-                          Duration loginTtl, Duration ipTtl) {
+                          Duration loginTtl, Duration ipTtl,
+                          Duration bedrockReuseWindow) {
         this.plugin = plugin;
         this.state = state;
         this.service = service;
         this.loginTtl = loginTtl;
         this.ipTtl = ipTtl;
+        this.bedrockReuseWindow = bedrockReuseWindow == null ? Duration.ofSeconds(60) : bedrockReuseWindow;
         this.folia = detectFolia();
     }
 
@@ -119,6 +122,20 @@ public class TimeoutManager {
         final Set<UUID> stillPendingIp = pendingIps.stream().map(LoginStatePort.PendingIp::uuid).collect(java.util.stream.Collectors.toSet());
         lastLoginTitle.keySet().removeIf(uuid -> !stillPendingLogin.contains(uuid));
         lastIpTitle.keySet().removeIf(uuid -> !stillPendingIp.contains(uuid));
+
+        // Clear Bedrock pending login after reuse window if player never returned
+        for (LoginStatePort.PendingLogin p : pendingLogins) {
+            if (!p.bedrock()) continue;
+            UUID uuid = p.uuid();
+            // Only consider players who are currently offline
+            if (Bukkit.getPlayer(uuid) != null) continue;
+            // If there is no recent code after leave (i.e., leftAt is older than window), clear pending state
+            boolean withinWindow = state.recentBedrockCodeAfterLeave(uuid, bedrockReuseWindow).isPresent();
+            if (!withinWindow) {
+                // Clear state silently (no kick since player is offline)
+                state.clearPendingLogin(uuid);
+            }
+        }
     }
 
     /**

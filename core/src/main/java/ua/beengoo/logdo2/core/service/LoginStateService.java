@@ -8,10 +8,11 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Тримає тимчасові стани: OAuth state і Bedrock коди + pending логін/IP. */
 public class LoginStateService implements LoginStatePort {
     private static final Duration OAUTH_STATE_TTL = Duration.ofMinutes(10);
     private static final Duration CODE_TTL        = Duration.ofMinutes(10);
+    // Bedrock code reuse window after the player leaves (configurable via ctor)
+    private final Duration bedrockReuseWindow;
 
     private final Map<String, OAuthState> oauthStates = new ConcurrentHashMap<>();
     private final Map<String, PendingCode> codes      = new ConcurrentHashMap<>();
@@ -19,6 +20,14 @@ public class LoginStateService implements LoginStatePort {
     private final Map<UUID, PendingIp> pendingIp = new ConcurrentHashMap<>();
     private final Map<UUID, BedrockShown> bedrockShown = new ConcurrentHashMap<>();
     private final SecureRandom rnd = new SecureRandom();
+
+    public LoginStateService() {
+        this(Duration.ofSeconds(60));
+    }
+
+    public LoginStateService(Duration bedrockReuseWindow) {
+        this.bedrockReuseWindow = bedrockReuseWindow == null ? Duration.ofSeconds(60) : bedrockReuseWindow;
+    }
 
     @Override
     public String createOAuthState(UUID uuid, String ip, String name, boolean bedrock) {
@@ -48,7 +57,6 @@ public class LoginStateService implements LoginStatePort {
             code = generateShortCode();
         } while (codes.containsKey(code));
         codes.put(code, new PendingCode(code, uuid, ip, name, Instant.now()));
-        // Remember what was shown last for potential resend
         bedrockShown.put(uuid, new BedrockShown(code, Instant.now(), null));
         return code;
     }
@@ -56,6 +64,21 @@ public class LoginStateService implements LoginStatePort {
     @Override
     public PendingCode consumeOneTimeCode(String code) {
         pruneCodes();
+        PendingCode pc = codes.get(code);
+        if (pc == null) return null;
+
+        // If the owner left and the reuse window passed, invalidate this code
+        BedrockShown info = bedrockShown.get(pc.uuid());
+        if (info != null && info.leftAt() != null) {
+            Instant cutoff = Instant.now().minus(bedrockReuseWindow);
+            if (cutoff.isAfter(info.leftAt())) {
+                // Expired after leave; remove and refuse consumption
+                codes.remove(code);
+                return null;
+            }
+        }
+
+        // Valid — remove and return
         return codes.remove(code);
     }
 
@@ -138,7 +161,7 @@ public class LoginStateService implements LoginStatePort {
     }
 
     private String generateShortCode() {
-        final String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // без схожих символів
+        final String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         StringBuilder sb = new StringBuilder(6);
         for (int i = 0; i < 6; i++) sb.append(alphabet.charAt(rnd.nextInt(alphabet.length())));
         return sb.toString();
