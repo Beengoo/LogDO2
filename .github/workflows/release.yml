@@ -84,6 +84,8 @@ jobs:
           external_repository: Pinecraft-Project/maven-repo
           publish_branch: main
           publish_dir: logdo2-api/build/repo-staging
+          enable_jekyll: true
+          exclude_assets: .nojekyll
           destination_dir: maven
           keep_files: true
           commit_message: "Publish Maven repo ${{ steps.vars.outputs.ver }} to main:/maven from LogDO2"
