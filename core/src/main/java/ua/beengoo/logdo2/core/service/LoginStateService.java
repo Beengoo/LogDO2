@@ -19,6 +19,7 @@ public class LoginStateService implements LoginStatePort {
     private final Map<UUID, PendingLogin> pendingLogin = new ConcurrentHashMap<>();
     private final Map<UUID, PendingIp> pendingIp = new ConcurrentHashMap<>();
     private final Map<UUID, BedrockShown> bedrockShown = new ConcurrentHashMap<>();
+    private final Set<UUID> limitBypass = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final SecureRandom rnd = new SecureRandom();
 
     public LoginStateService() {
@@ -139,6 +140,24 @@ public class LoginStateService implements LoginStatePort {
         if (info == null || info.code() == null || info.leftAt() == null) return Optional.empty();
         if (Instant.now().minus(maxAge).isAfter(info.leftAt())) return Optional.empty();
         return Optional.of(info.code());
+    }
+
+    // ===== admin: limit bypass =====
+    @Override
+    public void grantLimitBypass(UUID uuid) {
+        if (uuid != null) limitBypass.add(uuid);
+    }
+
+    @Override
+    public boolean hasLimitBypass(UUID uuid) {
+        if (uuid == null) return false;
+        return limitBypass.contains(uuid);
+    }
+
+    @Override
+    public boolean consumeLimitBypass(UUID uuid) {
+        if (uuid == null) return false;
+        return limitBypass.remove(uuid);
     }
 
     // ===== helpers =====

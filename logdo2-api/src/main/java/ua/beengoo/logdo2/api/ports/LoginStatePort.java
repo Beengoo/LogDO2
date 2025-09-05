@@ -39,6 +39,14 @@ public interface LoginStatePort {
      */
     java.util.Optional<String> recentBedrockCodeAfterLeave(UUID uuid, Duration maxAge);
 
+    // ===== Admin: temporary limit bypass =====
+    /** Grant a one-time bypass of per-Discord link limits for this profile. */
+    void grantLimitBypass(UUID uuid);
+    /** Check if bypass is granted (without consuming). */
+    boolean hasLimitBypass(UUID uuid);
+    /** Consume bypass if present; returns true if bypass was available and consumed. */
+    boolean consumeLimitBypass(UUID uuid);
+
     // ===== Дані структур =====
     record PendingIp(UUID uuid, String newIp, long discordId, Instant at) {}
     record OAuthState(UUID uuid, String ip, String name, boolean bedrock, Instant at) {}

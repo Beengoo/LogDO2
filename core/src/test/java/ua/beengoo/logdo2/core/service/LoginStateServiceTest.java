@@ -60,4 +60,17 @@ class LoginStateServiceTest {
         assertTrue(reused.isPresent());
         assertEquals(code, reused.get());
     }
+
+    @Test
+    void limitBypassGrantHasConsumeCycle() {
+        var svc = new LoginStateService();
+        var uuid = UUID.randomUUID();
+        assertFalse(svc.hasLimitBypass(uuid));
+        assertFalse(svc.consumeLimitBypass(uuid));
+        svc.grantLimitBypass(uuid);
+        assertTrue(svc.hasLimitBypass(uuid));
+        assertTrue(svc.consumeLimitBypass(uuid));
+        assertFalse(svc.hasLimitBypass(uuid));
+        assertFalse(svc.consumeLimitBypass(uuid));
+    }
 }

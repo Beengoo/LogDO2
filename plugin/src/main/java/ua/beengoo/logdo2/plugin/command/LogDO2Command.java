@@ -17,7 +17,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class LogDO2Command implements CommandExecutor, TabCompleter {
-    private static final List<String> SUBS = List.of("help", "link", "logout", "forgive", "reload");
+    private static final List<String> SUBS = List.of("help", "link", "logout", "forgive", "bypass", "reload");
 
     private final LoginService loginService;
     private final AccountsRepo accountsRepo;
@@ -54,6 +54,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             case "logout"  -> handleLogout(sender, args);
             case "forgive" -> handleForgive(sender, args);
             case "reload"  -> handleReload(sender);
+            case "bypass"  -> handleBypass(sender, args);
             default        -> sendHelp(sender);
         }
         if (audit != null) {
@@ -71,7 +72,42 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         s.sendMessage("§e/logdo2 logout <player_name|player_uuid|discord_id> §7— unlink target");
         s.sendMessage("§e/logdo2 logout <discord_id> <player_name|player_uuid> §7— unlink only that mapping");
         s.sendMessage("§e/logdo2 forgive <ip> §7— clear progressive ban & attempts for IP");
+        s.sendMessage("§e/logdo2 bypass <player_name|player_uuid> §7— allow profile to ignore per-Discord limit");
         s.sendMessage("§e/logdo2 reload §7— reload config & messages");
+    }
+
+    private void handleBypass(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("logdo2.admin.bypass")) { noPerm(sender); return; }
+        UUID targetUuid = null;
+        if (args.length >= 2) {
+            targetUuid = resolveUuid(args[1]);
+            if (targetUuid == null) {
+                sender.sendMessage("§cUnknown player: " + args[1]);
+                return;
+            }
+        } else if (sender instanceof Player p) {
+            targetUuid = p.getUniqueId();
+        } else {
+            usage(sender, "bypass <player_name|player_uuid>");
+            return;
+        }
+
+        // Mark one-time bypass in login state
+        ua.beengoo.logdo2.api.ports.LoginStatePort st = getLoginState();
+        if (st == null) {
+            sender.sendMessage("§cInternal error: login state not available.");
+            return;
+        }
+        st.grantLimitBypass(targetUuid);
+        sender.sendMessage("§aGranted one-time limit bypass for player §e" + targetUuid + "§a.");
+        if (audit != null) audit.log("admin", "grant_bypass", java.util.Map.of(
+                "sender", sender.getName(),
+                "player", targetUuid.toString()
+        ));
+    }
+
+    private ua.beengoo.logdo2.api.ports.LoginStatePort getLoginState() {
+        return org.bukkit.Bukkit.getServicesManager().load(ua.beengoo.logdo2.api.ports.LoginStatePort.class);
     }
 
     private void handleLink(CommandSender sender, String[] args) {
@@ -277,6 +313,19 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
                 if (--cap <= 0) break;
             }
             String pref = args[2].toLowerCase();
+            return res.stream().filter(s -> s.toLowerCase().startsWith(pref)).distinct().limit(100).toList();
+        }
+        // bypass <player_name|uuid>
+        if (args.length == 2 && args[0].equalsIgnoreCase("bypass")) {
+            List<String> res = new ArrayList<>();
+            res.addAll(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+            res.addAll(Bukkit.getOnlinePlayers().stream().map(p -> p.getUniqueId().toString()).toList());
+            int cap = 50;
+            for (OfflinePlayer op : Bukkit.getOfflinePlayers()) {
+                if (op.getName() != null) res.add(op.getName());
+                if (--cap <= 0) break;
+            }
+            String pref = args[1].toLowerCase();
             return res.stream().filter(s -> s.toLowerCase().startsWith(pref)).distinct().limit(100).toList();
         }
         return Collections.emptyList();

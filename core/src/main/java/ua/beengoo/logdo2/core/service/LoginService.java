@@ -187,7 +187,8 @@ public class LoginService {
         // Enforce per-Discord platform limits unless already linked to same discord
         String platform = st.bedrock() ? "BEDROCK" : "JAVA";
         var cur = accounts.findDiscordForProfile(st.uuid());
-        if (cur.isEmpty() || cur.get() != user.id()) {
+        boolean bypass = state.consumeLimitBypass(st.uuid());
+        if (!bypass && (cur.isEmpty() || cur.get() != user.id())) {
             int limit = st.bedrock() ? bedrockLimitPerDiscord : javaLimitPerDiscord;
             if (limit > 0) {
                 int count = accounts.countByDiscordAndPlatform(user.id(), platform, limitIncludeReserved);
@@ -260,10 +261,13 @@ public class LoginService {
         if (pending == null) return false;
 
         // Enforce Bedrock per-Discord limit before reserve
-        int limit = bedrockLimitPerDiscord;
-        if (limit > 0) {
-            int count = accounts.countByDiscordAndPlatform(discordUserId, "BEDROCK", limitIncludeReserved);
-            if (count >= limit) return false;
+        boolean bypass = state.hasLimitBypass(pending.uuid());
+        if (!bypass) {
+            int limit = bedrockLimitPerDiscord;
+            if (limit > 0) {
+                int count = accounts.countByDiscordAndPlatform(discordUserId, "BEDROCK", limitIncludeReserved);
+                if (count >= limit) return false;
+            }
         }
 
         // Reserve the link, full activation happens after OAuth
