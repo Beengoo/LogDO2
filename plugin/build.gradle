@@ -3,7 +3,6 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
-// Ensure this subproject explicitly uses the root project version
 version = rootProject.version
 
 dependencies {
@@ -26,10 +25,8 @@ dependencies {
     // Tests
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
 }
-
-tasks {
-    runServer { minecraftVersion("1.21.6") }
-
+runPaper.folia.registerTask() {
+    minecraftVersion("1.21.6")
     shadowJar {
         archiveClassifier.set("")
         archiveBaseName.set("LogDO2")
