@@ -27,14 +27,15 @@ dependencies {
 }
 runPaper.folia.registerTask() {
     minecraftVersion("1.21.6")
-    shadowJar {
-        archiveClassifier.set("")
-        archiveBaseName.set("LogDO2")
-        archiveVersion.set(rootProject.version as String)
-    }
-
-    build { dependsOn(shadowJar) }
 }
+
+shadowJar {
+    archiveClassifier.set("")
+    archiveBaseName.set("LogDO2")
+    archiveVersion.set(rootProject.version as String)
+}
+
+build { dependsOn(shadowJar) }
 
 // Inject project version into plugin.yml (replaces ${version})
 tasks.processResources {
