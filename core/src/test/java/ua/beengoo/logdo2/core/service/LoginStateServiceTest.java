@@ -73,4 +73,26 @@ class LoginStateServiceTest {
         assertFalse(svc.hasLimitBypass(uuid));
         assertFalse(svc.consumeLimitBypass(uuid));
     }
+
+
+    @Test
+    void recentBedrockCodeExpiresAfterMaxAge() throws Exception {
+        var svc = new LoginStateService();
+        var uuid = UUID.randomUUID();
+        svc.createOneTimeCode(uuid, "1.2.3.4", "Alex");
+        svc.recordBedrockLeave(uuid);
+        assertTrue(svc.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(60)).isPresent());
+        Thread.sleep(5);
+        assertTrue(svc.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofMillis(1)).isEmpty());
+    }
+
+    @Test
+    void bedrockCodeCannotBeConsumedAfterReuseWindow() throws Exception {
+        var svc = new LoginStateService(java.time.Duration.ofMillis(10));
+        var uuid = UUID.randomUUID();
+        String code = svc.createOneTimeCode(uuid, "1.2.3.4", "Alex");
+        svc.recordBedrockLeave(uuid);
+        Thread.sleep(15);
+        assertNull(svc.consumeOneTimeCode(code));
+    }
 }

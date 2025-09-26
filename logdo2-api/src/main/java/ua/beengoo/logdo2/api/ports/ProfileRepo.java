@@ -12,4 +12,5 @@ public interface ProfileRepo {
     void updatePlatform(UUID profileUuid, String platform);
     Optional<UUID> findUuidByName(String name);
     Optional<String> findNameByUuid(UUID uuid);
+    Optional<String> findPlatform(UUID uuid);
 }

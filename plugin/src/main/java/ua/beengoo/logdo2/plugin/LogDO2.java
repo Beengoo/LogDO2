@@ -230,7 +230,7 @@ public final class LogDO2 extends JavaPlugin {
         var sm = getServer().getServicesManager();
         sm.register(ProfileReadPort.class, new ProfileReadAdapter(profileRepo), this, ServicePriority.Normal);
         sm.register(ua.beengoo.logdo2.api.ports.AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
-        sm.register(LogDO2Api.class, new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, jda), this, ServicePriority.Normal);
+        sm.register(LogDO2Api.class, new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda), this, ServicePriority.Normal);
         // Expose LoginStatePort for admin commands or integrations that need temporary flags
         sm.register(LoginStatePort.class, loginStatePort, this, ServicePriority.Normal);
 

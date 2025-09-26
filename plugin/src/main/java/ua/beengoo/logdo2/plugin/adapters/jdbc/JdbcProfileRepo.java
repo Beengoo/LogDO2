@@ -56,6 +56,18 @@ public class JdbcProfileRepo implements ProfileRepo {
     }
 
     @Override
+    public Optional<String> findPlatform(UUID uuid) {
+        String sql = "SELECT platform FROM mc_profiles WHERE mc_uuid=? LIMIT 1";
+        try (var c = ds.getConnection(); var ps = c.prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) return Optional.ofNullable(rs.getString(1));
+                return Optional.empty();
+            }
+        } catch (Exception e) { throw new RuntimeException(e); }
+    }
+
+    @Override
     public Optional<String> findLastConfirmedIp(UUID profileUuid) {
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement("SELECT last_ip FROM mc_profiles WHERE mc_uuid=?")) {

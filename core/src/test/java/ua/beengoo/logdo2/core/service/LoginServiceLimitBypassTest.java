@@ -25,6 +25,7 @@ class LoginServiceLimitBypassTest {
         @Override public void updatePlatform(UUID profileUuid, String p) { platform.put(profileUuid, p); }
         @Override public Optional<UUID> findUuidByName(String name) { return Optional.empty(); }
         @Override public Optional<String> findNameByUuid(UUID uuid) { return Optional.empty(); }
+        @Override public Optional<String> findPlatform(UUID uuid) { return Optional.ofNullable(platform.get(uuid)); }
     }
 
     private static class FakeAccountsRepo implements AccountsRepo {
