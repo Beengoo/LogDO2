@@ -2,7 +2,9 @@ package ua.beengoo.logdo2.plugin.adapters.api;
 
 import net.dv8tion.jda.api.JDA;
 import org.junit.jupiter.api.Test;
-import ua.beengoo.logdo2.api.LogDO2User;
+import ua.beengoo.logdo2.api.DiscordAccount;
+import ua.beengoo.logdo2.api.MinecraftProfile;
+import ua.beengoo.logdo2.api.SessionView;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.LoginStateService;
@@ -52,33 +54,44 @@ class LogDO2ApiImplTest {
         LoginService loginService = createLoginService(state, profiles, accounts, log);
         LogDO2ApiImpl api = new LogDO2ApiImpl(loginService, profiles, accounts, state, (JDA) null);
 
-        LogDO2User user = api.getUser(primary);
+        // 1) MinecraftProfile
+        MinecraftProfile mp = api.getMinecraftProfile(primary);
+        assertEquals(primary, mp.uuid());
+        assertEquals("Steve", mp.name());
+        assertEquals(MinecraftProfile.MinecraftPlatform.BEDROCK, mp.platform());
+        assertEquals("10.0.0.1", mp.lastConfirmedIp());
+        assertTrue(mp.linkedDiscord().isPresent());
+        assertEquals(Optional.of(activeDiscord), mp.linkedDiscord());
 
-        assertEquals(primary, user.profile().uuid());
-        assertEquals("Steve", user.profile().name());
-        assertEquals(LogDO2User.MinecraftPlatform.BEDROCK, user.profile().platform());
-        assertEquals("10.0.0.1", user.profile().lastConfirmedIp());
+        // 2) DiscordAccount
+        DiscordAccount da = api.getDiscordAccount(activeDiscord);
+        assertEquals(activeDiscord, da.discordId());
+        List<DiscordAccount.MinecraftProfileSummary> summaries = da.profiles();
+        assertEquals(2, summaries.size());
 
-        assertEquals(Optional.of(activeDiscord), user.discord().activeDiscordId());
-        assertEquals(Optional.of(anyDiscord), user.discord().anyDiscordId());
+        // переконаємось, що обидва UUID присутні
+        assertTrue(summaries.stream().anyMatch(s -> s.uuid().equals(primary)));
+        assertTrue(summaries.stream().anyMatch(s -> s.uuid().equals(alt)));
 
-        List<LogDO2User.LinkedProfile> linked = new ArrayList<>(user.discord().profiles());
-        assertEquals(2, linked.size());
-        assertTrue(linked.get(0).primary());
-        assertEquals(primary, linked.get(0).profile().uuid());
-        assertFalse(linked.get(1).primary());
-        assertEquals(alt, linked.get(1).profile().uuid());
-        assertEquals(LogDO2User.MinecraftPlatform.JAVA, linked.get(1).profile().platform());
+        // перевірка платформи для alt
+        DiscordAccount.MinecraftProfileSummary altSummary =
+                summaries.stream().filter(s -> s.uuid().equals(alt)).findFirst().orElseThrow();
+        assertEquals(MinecraftProfile.MinecraftPlatform.JAVA, altSummary.platform());
 
-        assertTrue(user.session().isPendingLogin());
-        assertEquals("5.5.5.5", user.session().pendingLogin().get().ip());
-        assertTrue(user.session().pendingLogin().get().bedrock());
+        // 3) Session (окрема view)
+        SessionView session = api.getSessionForProfile(primary);
+        assertTrue(session.pendingLogin().isPresent());
+        assertEquals("5.5.5.5", session.pendingLogin().get().ip());
+        assertTrue(session.pendingLogin().get().bedrock());
 
-        assertTrue(user.session().isPendingIpConfirm());
-        assertEquals("20.0.0.1", user.session().pendingIpConfirm().get().newIp());
-        assertEquals(activeDiscord, user.session().pendingIpConfirm().get().discordId());
-        assertTrue(user.session().limitBypassGranted());
+        assertTrue(session.pendingIpConfirm().isPresent());
+        assertEquals("20.0.0.1", session.pendingIpConfirm().get().newIp());
+        assertEquals(activeDiscord, session.pendingIpConfirm().get().discordId());
+
+        assertTrue(session.limitBypassGranted());
     }
+
+
 
     private LoginService createLoginService(LoginStateService state, RecordingProfileRepo profiles, RecordingAccountsRepo accounts, Logger log) {
         return new LoginService(

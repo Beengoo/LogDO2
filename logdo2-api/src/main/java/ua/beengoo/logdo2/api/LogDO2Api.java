@@ -15,7 +15,9 @@ public interface LogDO2Api {
     Set<UUID> getProfiles(Long discordId);
     Optional<String> lastConfirmedIp(UUID uuid);
     boolean isActionAllowed(UUID uuid, String currentIp);
-    LogDO2User getUser(UUID uuid);
+    DiscordAccount getDiscordAccount(long discordId);
+    MinecraftProfile getMinecraftProfile(UUID uuid);
+    SessionView getSessionForProfile(UUID uuid);
     JDA getDiscordBot();
 }
 

@@ -1,17 +1,17 @@
 package ua.beengoo.logdo2.plugin.adapters.api;
 
 import net.dv8tion.jda.api.JDA;
+import ua.beengoo.logdo2.api.DiscordAccount;
 import ua.beengoo.logdo2.api.LogDO2Api;
-import ua.beengoo.logdo2.api.LogDO2User;
+import ua.beengoo.logdo2.api.MinecraftProfile;
+import ua.beengoo.logdo2.api.SessionView;
 import ua.beengoo.logdo2.api.ports.AccountsRepo;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.api.ports.ProfileRepo;
 import ua.beengoo.logdo2.core.service.LoginService;
 
-import java.util.LinkedHashSet;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class LogDO2ApiImpl implements LogDO2Api {
     private final LoginService service;
@@ -58,51 +58,57 @@ public class LogDO2ApiImpl implements LogDO2Api {
     }
 
     @Override
-    public LogDO2User getUser(UUID uuid) {
-        var primary = buildProfile(uuid);
-        var activeDiscord = accounts.findDiscordForProfile(uuid);
-        var anyDiscord = accounts.findAnyDiscordForProfile(uuid);
+    public DiscordAccount getDiscordAccount(long discordId) {
+        // keep order: accounts.findProfilesForDiscord returns a Set — if you need order, ensure repo uses LinkedHashSet
+        List<DiscordAccount.MinecraftProfileSummary> summaries = accounts.findProfilesForDiscord(discordId).stream()
+                .map(uuid -> {
+                    String name = profiles.findNameByUuid(uuid).orElse(null);
+                    MinecraftProfile.MinecraftPlatform platform = profiles.findPlatform(uuid)
+                            .map(MinecraftProfile.MinecraftPlatform::fromDatabase)
+                            .orElse(MinecraftProfile.MinecraftPlatform.UNKNOWN);
+                    boolean primary = accounts.findDiscordForProfile(uuid).map(d -> d == discordId).orElse(false);
+                    return new DiscordAccount.MinecraftProfileSummary(uuid, name, platform, primary);
+                })
+                .collect(Collectors.toList());
+        return new DiscordAccount(discordId, summaries);
+    }
 
-        var profilesForDiscord = new LinkedHashSet<LogDO2User.LinkedProfile>();
-        profilesForDiscord.add(new LogDO2User.LinkedProfile(primary, true));
+    @Override
+    public MinecraftProfile getMinecraftProfile(UUID uuid) {
+        String name = profiles.findNameByUuid(uuid).orElse(null);
+        MinecraftProfile.MinecraftPlatform platform = profiles.findPlatform(uuid)
+                .map(MinecraftProfile.MinecraftPlatform::fromDatabase)
+                .orElse(MinecraftProfile.MinecraftPlatform.UNKNOWN);
+        String lastIp = profiles.findLastConfirmedIp(uuid).orElse(null);
+        Optional<Long> linkedDiscord = accounts.findDiscordForProfile(uuid);
+        return new MinecraftProfile(uuid, name, platform, lastIp, linkedDiscord);
+    }
 
-        activeDiscord.ifPresent(discordId -> {
-            for (UUID linkedUuid : accounts.findProfilesForDiscord(discordId)) {
-                if (linkedUuid.equals(uuid)) continue;
-                var profile = buildProfile(linkedUuid);
-                profilesForDiscord.add(new LogDO2User.LinkedProfile(profile, false));
-            }
-        });
-
-        var pendingLogin = loginState.listPendingLogins().stream()
+    public SessionView getSessionForProfile(UUID uuid) {
+        Optional<SessionView.PendingLoginView> pendingLogin = loginState.listPendingLogins().stream()
                 .filter(pl -> pl.uuid().equals(uuid))
                 .findFirst()
-                .map(pl -> new LogDO2User.PendingLogin(pl.ip(), pl.bedrock(), pl.at()));
+                .map(pl -> new SessionView.PendingLoginView(pl.ip(), pl.bedrock(), pl.at()));
 
-        var pendingIp = loginState.listPendingIpConfirms().stream()
+        Optional<SessionView.PendingIpConfirmView> pendingIp = loginState.listPendingIpConfirms().stream()
                 .filter(pi -> pi.uuid().equals(uuid))
                 .findFirst()
-                .map(pi -> new LogDO2User.PendingIpConfirm(pi.newIp(), pi.discordId(), pi.at()));
+                .map(pi -> new SessionView.PendingIpConfirmView(pi.newIp(), pi.discordId(), pi.at()));
 
         boolean bypass = loginState.hasLimitBypass(uuid);
+        return new SessionView(pendingLogin, pendingIp, bypass);
+    }
 
-        var session = new LogDO2User.Session(pendingLogin, pendingIp, bypass);
-        var discord = new LogDO2User.DiscordLink(activeDiscord, anyDiscord, profilesForDiscord);
-
-        return new LogDO2User(primary, discord, session);
+    public List<MinecraftProfile> getUsersByDiscord(long discordId) {
+        List<MinecraftProfile> list = new ArrayList<>();
+        for (UUID uuid : accounts.findProfilesForDiscord(discordId)) {
+            list.add(getMinecraftProfile(uuid));
+        }
+        return List.copyOf(list);
     }
 
     @Override
     public JDA getDiscordBot() {
         return discordBot;
-    }
-
-    private LogDO2User.MinecraftProfile buildProfile(UUID uuid) {
-        var name = profiles.findNameByUuid(uuid).orElse(null);
-        var platform = profiles.findPlatform(uuid)
-                .map(LogDO2User.MinecraftPlatform::fromDatabase)
-                .orElse(LogDO2User.MinecraftPlatform.UNKNOWN);
-        var lastIp = profiles.findLastConfirmedIp(uuid).orElse(null);
-        return new LogDO2User.MinecraftProfile(uuid, name, platform, lastIp);
     }
 }
