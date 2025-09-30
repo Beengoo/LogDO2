@@ -7,6 +7,10 @@ discord:
   # Used when postLogin.action == discord-invite
   targetGuildId: ""
   inviteChannelId: ""
+  intents:
+    - "GUILD_MESSAGES"
+    - "MESSAGE_CONTENT"
+    - "DIRECT_MESSAGES"
 
 oauth:
   clientId: "DISCORD_OAUTH_CLIENT_ID"

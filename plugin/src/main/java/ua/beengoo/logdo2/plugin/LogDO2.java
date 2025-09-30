@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin;
 
+import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
@@ -8,6 +9,7 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.api.LogDO2Api;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.core.service.LoginService;
@@ -25,6 +27,8 @@ import ua.beengoo.logdo2.plugin.listeners.PlayerListener;
 import ua.beengoo.logdo2.plugin.listeners.PreLoginListener;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
+import ua.beengoo.logdo2.plugin.util.EnumsUtil;
+import ua.beengoo.logdo2.plugin.util.StringUtil;
 import ua.beengoo.logdo2.plugin.util.TokenCrypto;
 import ua.beengoo.logdo2.plugin.web.LoginEndpoint;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
@@ -33,8 +37,10 @@ import ua.beengoo.logdo2.plugin.adapters.api.LogDO2ApiImpl;
 import ua.beengoo.logdo2.plugin.adapters.api.ProfileReadAdapter;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 public final class LogDO2 extends JavaPlugin {
     private JDA jda;
     private LoginEndpoint loginEndpoint;
@@ -65,11 +71,13 @@ public final class LogDO2 extends JavaPlugin {
         this.messages = new YamlMessages(this);
 
         int    webPort      = getConfig().getInt("web.port", 8080);
-        String publicUrl    = stripTrailingSlash(getConfig().getString("web.publicUrl", "http://localhost:" + webPort));
+        String publicUrl    = StringUtil.stripTrailingSlash(getConfig().getString("web.publicUrl", "http://localhost:" + webPort));
         String botToken     = getConfig().getString("discord.botToken", "");
         String clientId     = getConfig().getString("oauth.clientId", "");
         String clientSecret = getConfig().getString("oauth.clientSecret", "");
         String scopes       = getConfig().getString("oauth.scopes", "identify email applications.commands");
+
+        List<String> intentNames = getConfig().getStringList("discord.intents");
 
         long loginSec  = getConfig().getLong("timeouts.loginSeconds", 300L);
         long ipConfSec = getConfig().getLong("timeouts.ipConfirmSeconds", 180L);
@@ -95,7 +103,7 @@ public final class LogDO2 extends JavaPlugin {
         // Crypto
         String keyB64 = getConfig().getString("security.tokenEncryptionKeyBase64", "");
         if (keyB64.isBlank()) {
-            getLogger().severe("security.tokenEncryptionKeyBase64 is missing in config.yml");
+            log.error("security.tokenEncryptionKeyBase64 is missing in config.yml");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -115,7 +123,7 @@ public final class LogDO2 extends JavaPlugin {
         if (this.oauthPort == null) {
             this.oauthPort = new DiscordOAuthAdapter(getLogger(), clientId, clientSecret, scopes);
         } else {
-            getLogger().info("[LogDO2] Using external OAuthPort provider.");
+            log.info("Using external OAuthPort provider.");
         }
 
         // Core
@@ -138,25 +146,24 @@ public final class LogDO2 extends JavaPlugin {
         );
 
 
+
         // Discord
         this.jda = JDABuilder.createDefault(
                         botToken,
-                        GatewayIntent.GUILD_MESSAGES,
-                        GatewayIntent.DIRECT_MESSAGES
+                        EnumsUtil.parseEnums(GatewayIntent.class, intentNames)
                 )
                 .addEventListeners(
                         new JdaSlashLoginListener(loginService, getLogger(), messages, audit),
                         new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger(), audit),
                         new ListenerAdapter() {
-                            @Override public void onReady(ReadyEvent event) {
+                            @Override public void onReady(@NotNull ReadyEvent event) {
                                 SlashCommandRegistrar.register(jda);
                                 // Install default DM adapter only if no external provider was set earlier
                                 if (discordDmPort == null) {
                                     discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, LogDO2.this);
                                     loginService.setDiscordDmPort(discordDmPort);
-                                    getLogger().info("[LogDO2] JDA is READY. DM adapter installed.");
                                 } else {
-                                    getLogger().info("[LogDO2] JDA is READY. External DM adapter in use.");
+                                    log.info("External DM adapter used.");
                                 }
                             }
                         }
@@ -167,7 +174,7 @@ public final class LogDO2 extends JavaPlugin {
         if (externalDm != null) {
             this.discordDmPort = externalDm;
             this.loginService.setDiscordDmPort(discordDmPort);
-            getLogger().info("[LogDO2] Using external DiscordDmPort provider.");
+            log.info("Using external DM provider.");
         } else {
             this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, this);
             this.loginService.setDiscordDmPort(discordDmPort);
@@ -180,7 +187,7 @@ public final class LogDO2 extends JavaPlugin {
             try {
                 this.audit = new AuditLogger(this, auditFile);
             } catch (Exception e) {
-                getLogger().warning("Failed to open audit log: " + e.getMessage());
+                log.warn("Failed to open audit log", e);
             }
         } else {
             this.audit = null;
@@ -208,7 +215,7 @@ public final class LogDO2 extends JavaPlugin {
 
         // Bukkit listeners & timeouts
         this.floodgate = new FloodgateHook();
-        if (floodgate.isPresent()) getLogger().info("[LogDO2] Floodgate detected. Bedrock support enabled.");
+        if (floodgate.isPresent()) log.info("Floodgate is supported!");
         Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages, audit), this);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this, audit), this);
         this.timeouts = new TimeoutManager(
@@ -223,7 +230,7 @@ public final class LogDO2 extends JavaPlugin {
         IpPolicyPort ipPolicy = getServer().getServicesManager().load(IpPolicyPort.class);
         if (ipPolicy != null) {
             loginService.setIpPolicyPort(ipPolicy);
-            getLogger().info("[LogDO2] IpPolicyPort provider installed.");
+            log.info("External IP Policy in use.");
         }
 
         // Register public services for integrations (read-only)
@@ -234,7 +241,8 @@ public final class LogDO2 extends JavaPlugin {
         // Expose LoginStatePort for admin commands or integrations that need temporary flags
         sm.register(LoginStatePort.class, loginStatePort, this, ServicePriority.Normal);
 
-        getLogger().info("LogDO2 enabled with DB " + db.dialect());
+        log.info("Using SQL dialect: {}", db.dialect());
+        log.info("LogDO2 is ready!");
     }
 
     @Override
@@ -244,7 +252,7 @@ public final class LogDO2 extends JavaPlugin {
         if (jda != null) jda.shutdownNow();
         if (db != null) db.stop();
         if (audit != null) try { audit.close(); } catch (Exception ignored) {}
-        getLogger().info("LogDO2 disabled.");
+        log.info("LogDO2 disabled, bye-bye!");
     }
 
     public void updateConfigDefaults() {
@@ -271,12 +279,7 @@ public final class LogDO2 extends JavaPlugin {
                 reloadConfig();
             }
         } catch (Exception e) {
-            getLogger().warning("Failed to merge default config: " + e.getMessage());
+            log.warn("Failed to marge default config", e);
         }
-    }
-
-    private static String stripTrailingSlash(String s) {
-        if (s == null) return null;
-        return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
     }
 }

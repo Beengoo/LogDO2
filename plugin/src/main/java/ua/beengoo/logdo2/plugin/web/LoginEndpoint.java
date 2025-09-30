@@ -2,6 +2,7 @@ package ua.beengoo.logdo2.plugin.web;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -13,6 +14,7 @@ import ua.beengoo.logdo2.core.service.ForbiddenLinkException;
 
 import java.util.logging.Logger;
 
+@Slf4j
 public class LoginEndpoint {
     private final Logger logger;
     private final LoginService loginService;
@@ -111,7 +113,7 @@ public class LoginEndpoint {
                             : "Discord account linked. You can return to the game.");
             }
         } catch (ForbiddenLinkException ex) {
-            logger.warning("OAuth forbidden: " + ex.getMessage());
+            log.warn("OAuth2 attempt forbidden, check LogDO2 audit file.", ex);
             if (audit != null) audit.log("web", "oauth_callback_forbidden", java.util.Map.of(
                     "state", state,
                     "error", ex.getMessage() == null ? "forbidden" : ex.getMessage()
@@ -159,7 +161,7 @@ public class LoginEndpoint {
                     }
                 }
             } catch (Exception e) {
-                logger.warning("Failed to retrieve existing invites: " + e.getMessage());
+                log.warn("Unable to retrieve existing URL", e);
             }
 
             if (url == null) {
@@ -177,7 +179,7 @@ public class LoginEndpoint {
             ));
             ctx.redirect(url);
         } catch (Exception e) {
-            logger.warning("Failed to create/retrieve invite: " + e.getMessage());
+            log.warn("Unable to retrieve invite link", e);
             if (audit != null) audit.log("web", "post_discord_invite_error", java.util.Map.of(
                     "guild", targetGuildId,
                     "channel", inviteChannelId,
