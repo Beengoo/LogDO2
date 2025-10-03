@@ -52,7 +52,7 @@ class LogDO2ApiImplTest {
         state.grantLimitBypass(primary);
 
         LoginService loginService = createLoginService(state, profiles, accounts, log);
-        LogDO2ApiImpl api = new LogDO2ApiImpl(loginService, profiles, accounts, state, (JDA) null);
+        LogDO2ApiImpl api = new LogDO2ApiImpl(loginService, profiles, accounts, state, (JDA) null, null);
 
         // 1) MinecraftProfile
         MinecraftProfile mp = api.getMinecraftProfile(primary);

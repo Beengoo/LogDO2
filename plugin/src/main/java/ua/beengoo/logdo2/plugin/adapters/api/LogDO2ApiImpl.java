@@ -19,17 +19,20 @@ public class LogDO2ApiImpl implements LogDO2Api {
     private final AccountsRepo accounts;
     private final LoginStatePort loginState;
     private final JDA discordBot;
+    private final String targetGuildId;
 
     public LogDO2ApiImpl(LoginService service,
                          ProfileRepo profiles,
                          AccountsRepo accounts,
                          LoginStatePort loginState,
-                         JDA discordBot) {
+                         JDA discordBot,
+                         String targetGuildId) {
         this.service = service;
         this.profiles = profiles;
         this.accounts = accounts;
         this.loginState = loginState;
         this.discordBot = discordBot;
+        this.targetGuildId = targetGuildId;
     }
 
     @Override
@@ -110,5 +113,10 @@ public class LogDO2ApiImpl implements LogDO2Api {
     @Override
     public JDA getDiscordBot() {
         return discordBot;
+    }
+
+    @Override
+    public String getTargetGuildId() {
+        return targetGuildId;
     }
 }

@@ -19,5 +19,6 @@ public interface LogDO2Api {
     MinecraftProfile getMinecraftProfile(UUID uuid);
     SessionView getSessionForProfile(UUID uuid);
     JDA getDiscordBot();
+    String getTargetGuildId();
 }
 
