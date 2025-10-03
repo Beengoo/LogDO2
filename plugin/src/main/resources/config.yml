@@ -7,6 +7,10 @@ discord:
   # Used when postLogin.action == discord-invite
   targetGuildId: ""
   inviteChannelId: ""
+  # Allow JDA (Discord bot backend for LogDO2) to store cache in chunks, might be useful for large discord servers
+  enableCacheChunking: true
+  # Allow JDA to retrieve and store members in memory, require GUILD_MEMBERS intent, also might cause huge memory usage on large discord servers.
+  cacheAllGuildMembers: true
   intents:
     - "GUILD_MESSAGES"
     - "MESSAGE_CONTENT"

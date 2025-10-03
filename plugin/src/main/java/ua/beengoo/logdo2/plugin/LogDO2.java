@@ -6,6 +6,8 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -79,6 +81,9 @@ public final class LogDO2 extends JavaPlugin {
 
         List<String> intentNames = getConfig().getStringList("discord.intents");
 
+        boolean enableCacheChunking = getConfig().getBoolean("discord.enableCacheChunking");
+        boolean cacheAllGuildMembers = getConfig().getBoolean("discord.cacheAllGuildMembers");
+
         long loginSec  = getConfig().getLong("timeouts.loginSeconds", 300L);
         long ipConfSec = getConfig().getLong("timeouts.ipConfirmSeconds", 180L);
 
@@ -148,7 +153,7 @@ public final class LogDO2 extends JavaPlugin {
 
 
         // Discord
-        this.jda = JDABuilder.createDefault(
+        var jdaBuilder = JDABuilder.createDefault(
                         botToken,
                         EnumsUtil.parseEnums(GatewayIntent.class, intentNames)
                 )
@@ -167,7 +172,16 @@ public final class LogDO2 extends JavaPlugin {
                                 }
                             }
                         }
-                ).build();
+                );
+
+        if (enableCacheChunking) {
+            jdaBuilder.setMemberCachePolicy(MemberCachePolicy.ALL);
+        }
+        if (cacheAllGuildMembers) {
+            jdaBuilder.setChunkingFilter(ChunkingFilter.ALL);
+        }
+
+        this.jda = jdaBuilder.build();
 
         // Discord DM adapter (prefer external provider if present)
         DiscordDmPort externalDm = getServer().getServicesManager().load(DiscordDmPort.class);
