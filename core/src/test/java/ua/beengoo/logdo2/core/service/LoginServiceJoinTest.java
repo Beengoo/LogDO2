@@ -2,6 +2,8 @@ package ua.beengoo.logdo2.core.service;
 
 import org.junit.jupiter.api.Test;
 import ua.beengoo.logdo2.api.ports.*;
+import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,10 +20,22 @@ class LoginServiceJoinTest {
         @Override public String mc(String path, Map<String, String> placeholders) { return path; }
     };
 
+    private static final PropertiesProvider props = new PropertiesProvider() {
+        @Override
+        public ua.beengoo.logdo2.api.provider.Properties getSnapshot() {
+            return new Properties(
+                    60,
+                    1, 1,
+                    true, true, 0, 2, 4, 100,
+                    true
+            );
+        }
+    };
+
     @Test
     void bedrockJoinCreatesPendingLoginAndPlatform() {
         try (var ignored = BukkitStub.install()) {
-            var state = new LoginStateService(Duration.ofSeconds(60));
+            var state = new LoginStateService(props);
             var profiles = new TestProfileRepo();
             var accounts = new TestAccountsRepo();
             var service = createService(state, profiles, accounts, new NoopDm());
@@ -40,7 +54,7 @@ class LoginServiceJoinTest {
     @Test
     void ipChangeTriggersPendingConfirmationAndDm() {
         try (var ignored = BukkitStub.install()) {
-            var state = new LoginStateService(Duration.ofSeconds(60));
+            var state = new LoginStateService(props);
             var profiles = new TestProfileRepo();
             var dm = new RecordingDm();
             var accounts = new TestAccountsRepo();
@@ -72,7 +86,7 @@ class LoginServiceJoinTest {
     @Test
     void oauthCallbackConsumesBypassAndActivatesAccount() {
         try (var ignored = BukkitStub.install()) {
-            var state = new LoginStateService(Duration.ofSeconds(60));
+            var state = new LoginStateService(props);
             var profiles = new TestProfileRepo();
             var dm = new RecordingDm();
             var accounts = new TestAccountsRepo();
@@ -101,15 +115,8 @@ class LoginServiceJoinTest {
                     discordRepo,
                     null,
                     banRepo,
-                    false,
-                    10, 2.0, 100, 100,
-                    "",
-                    MSG,
-                    60,
-                    1,
-                    1,
-                    false,
-                    false
+                    props,
+                    MSG
             );
 
             String stateToken = service.createOAuthState(uuid, "4.4.4.4", "Player", false);
@@ -153,15 +160,8 @@ class LoginServiceJoinTest {
                 null,
                 null,
                 new StubBanProgressRepo(),
-                false,
-                10, 2.0, 100, 100,
-                "",
-                MSG,
-                60,
-                2,
-                2,
-                false,
-                false
+                props,
+                MSG
         );
     }
 

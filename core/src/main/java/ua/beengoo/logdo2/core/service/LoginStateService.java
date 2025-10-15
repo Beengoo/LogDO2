@@ -1,6 +1,8 @@
 package ua.beengoo.logdo2.core.service;
 
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
+import ua.beengoo.logdo2.api.provider.PropertiesProvider;
+import ua.beengoo.logdo2.api.provider.Properties;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -11,8 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LoginStateService implements LoginStatePort {
     private static final Duration OAUTH_STATE_TTL = Duration.ofMinutes(10);
     private static final Duration CODE_TTL        = Duration.ofMinutes(10);
-    // Bedrock code reuse window after the player leaves (configurable via ctor)
-    private final Duration bedrockReuseWindow;
+
+    private final PropertiesProvider propertiesProvider;
 
     private final Map<String, OAuthState> oauthStates = new ConcurrentHashMap<>();
     private final Map<String, PendingCode> codes      = new ConcurrentHashMap<>();
@@ -22,12 +24,8 @@ public class LoginStateService implements LoginStatePort {
     private final Set<UUID> limitBypass = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final SecureRandom rnd = new SecureRandom();
 
-    public LoginStateService() {
-        this(Duration.ofSeconds(60));
-    }
-
-    public LoginStateService(Duration bedrockReuseWindow) {
-        this.bedrockReuseWindow = bedrockReuseWindow == null ? Duration.ofSeconds(60) : bedrockReuseWindow;
+    public LoginStateService(PropertiesProvider propertiesProvider) {
+        this.propertiesProvider = propertiesProvider;
     }
 
     @Override
@@ -67,11 +65,12 @@ public class LoginStateService implements LoginStatePort {
         pruneCodes();
         PendingCode pc = codes.get(code);
         if (pc == null) return null;
+        Properties props = propertiesProvider.getSnapshot();
 
         // If the owner left and the reuse window passed, invalidate this code
         BedrockShown info = bedrockShown.get(pc.uuid());
         if (info != null && info.leftAt() != null) {
-            Instant cutoff = Instant.now().minus(bedrockReuseWindow);
+            Instant cutoff = Instant.now().minus(Duration.ofSeconds(props.bedrockCodeTimeAfterLeave));
             if (cutoff.isAfter(info.leftAt())) {
                 // Expired after leave; remove and refuse consumption
                 codes.remove(code);

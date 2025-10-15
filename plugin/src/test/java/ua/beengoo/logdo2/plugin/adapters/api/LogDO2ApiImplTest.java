@@ -6,6 +6,8 @@ import ua.beengoo.logdo2.api.DiscordAccount;
 import ua.beengoo.logdo2.api.MinecraftProfile;
 import ua.beengoo.logdo2.api.SessionView;
 import ua.beengoo.logdo2.api.ports.*;
+import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.LoginStateService;
 
@@ -23,9 +25,21 @@ class LogDO2ApiImplTest {
         @Override public String mc(String path, Map<String, String> placeholders) { return path; }
     };
 
+    private static final PropertiesProvider props = new PropertiesProvider() {
+        @Override
+        public Properties getSnapshot() {
+            return new Properties(
+                    60,
+                    1, 1,
+                    true, true, 0, 2, 4, 100,
+                    true
+            );
+        }
+    };
+
     @Test
     void getUserAggregatesProfilesAndSession() {
-        var state = new LoginStateService(Duration.ofSeconds(120));
+        var state = new LoginStateService(null);
         var profiles = new RecordingProfileRepo();
         var accounts = new RecordingAccountsRepo();
         var log = Logger.getLogger("test");
@@ -107,15 +121,8 @@ class LogDO2ApiImplTest {
                 null,
                 null,
                 new StubBanProgressRepo(),
-                false,
-                10, 2.0, 100, 100,
-                "",
-                MSG,
-                60,
-                3,
-                3,
-                false,
-                false
+                null,
+                MSG
         );
     }
 

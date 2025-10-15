@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -29,6 +30,7 @@ import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.listeners.PlayerListener;
 import ua.beengoo.logdo2.plugin.listeners.PreLoginListener;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
+import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
 import ua.beengoo.logdo2.plugin.util.EnumsUtil;
 import ua.beengoo.logdo2.plugin.util.StringUtil;
@@ -50,6 +52,9 @@ public final class LogDO2 extends JavaPlugin {
     private TimeoutManager timeouts;
     private AuditLogger audit;
 
+    @Getter
+    private LoginService loginService;
+
     // Ports/adapters
     private OAuthPort oauthPort;
     private DiscordDmPort discordDmPort;
@@ -63,11 +68,11 @@ public final class LogDO2 extends JavaPlugin {
     private LoginStatePort loginStatePort;
 
     private DatabaseManager db;
-    private LoginService loginService;
     private FloodgateHook floodgate;
 
     @Override
     public void onEnable() {
+        Config.init(this);
         saveDefaultConfig();
         Config.updateConfigDefaults();
         this.messages = new YamlMessages(this);
@@ -87,19 +92,7 @@ public final class LogDO2 extends JavaPlugin {
         long loginSec  = getConfig().getLong("timeouts.loginSeconds", 300L);
         long ipConfSec = getConfig().getLong("timeouts.ipConfirmSeconds", 180L);
 
-        boolean bansEnabled = getConfig().getBoolean("bans.enabled", true);
-        long    baseSec     = getConfig().getLong("bans.baseSeconds", 1800L);
-        double  mult        = getConfig().getDouble("bans.multiplier", 2.0);
-        long    maxSec      = getConfig().getLong("bans.maxSeconds", 604800L);
         int     bctal       = getConfig().getInt("platform.bedrockCodeTimeAfterLeave");
-        long    windowSec   = getConfig().getLong("bans.trackWindowSeconds", 2592000L);
-        String  reasonTpl   = getConfig().getString("bans.reasonTemplate", "Suspicious login attempt. Ban: %DURATION%.");
-
-        // Limits
-        int javaLimit    = getConfig().getInt("limits.perDiscord.java", 1);
-        int bedrockLimit = getConfig().getInt("limits.perDiscord.bedrock", 1);
-        boolean includeReserved = getConfig().getBoolean("limits.perDiscord.includeReserved", false);
-        boolean disallowSimultaneousPlay = getConfig().getBoolean("limits.perDiscord.disallowSimultaneousPlay", false);
 
         // DB → migrations
         this.db = new DatabaseManager(this);
@@ -120,7 +113,7 @@ public final class LogDO2 extends JavaPlugin {
         this.tokensRepo      = new JdbcTokensRepo(db.dataSource(), crypto, db.dialect());
         this.discordUserRepo = new JdbcDiscordUserRepo(db.dataSource(), db.dialect());
         this.banProgressRepo = new JdbcBanProgressRepo(db.dataSource(), db.dialect());
-        this.loginStatePort  = new LoginStateService(Duration.ofSeconds(bctal));
+        this.loginStatePort  = new LoginStateService(LogDO2PropertiesManager.getINSTANCE());
 
         // OAuth (allow external override via ServicesManager)
         String redirectUri = publicUrl + "/oauth/callback";
@@ -139,15 +132,8 @@ public final class LogDO2 extends JavaPlugin {
                 discordUserRepo,
                 this,
                 banProgressRepo,
-                bansEnabled,
-                baseSec, mult, maxSec, windowSec,
-                reasonTpl,
-                messages,
-                bctal,
-                javaLimit,
-                bedrockLimit,
-                includeReserved,
-                disallowSimultaneousPlay
+                LogDO2PropertiesManager.getINSTANCE(),
+                messages
         );
 
 

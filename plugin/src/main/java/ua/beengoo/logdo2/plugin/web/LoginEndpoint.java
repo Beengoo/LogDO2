@@ -113,14 +113,13 @@ public class LoginEndpoint {
                             : "Discord account linked. You can return to the game.");
             }
         } catch (ForbiddenLinkException ex) {
-            log.warn("OAuth2 attempt forbidden, check LogDO2 audit file.", ex);
             if (audit != null) audit.log("web", "oauth_callback_forbidden", java.util.Map.of(
                     "state", state,
                     "error", ex.getMessage() == null ? "forbidden" : ex.getMessage()
             ));
             ctx.status(403).result("Forbidden: profile reserved for another Discord account");
         } catch (Exception ex) {
-            logger.warning("OAuth callback failed: " + ex.getMessage());
+            log.error("Unexpected error while login handle", ex);
             if (audit != null) audit.log("web", "oauth_callback_error", java.util.Map.of(
                     "state", state,
                     "error", ex.getMessage() == null ? "error" : ex.getMessage()

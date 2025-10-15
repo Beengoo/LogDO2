@@ -7,6 +7,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.ports.*;
+import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
 import java.util.Map;
 import java.util.Objects;
@@ -29,33 +31,18 @@ public class LoginService {
     private final MessagesPort msg;
     private IpPolicyPort ipPolicy; // optional, provided by other plugins via Services
 
+    private final PropertiesProvider propertiesProvider;
+
     private final BanProgressRepo banProgressRepo;
-    private final boolean bansEnabled;
-    private final long banBaseSec, banMaxSec, banTrackWindowSec;
-    private final double banMultiplier;
-    private final String banReasonTpl;
-    private final int bedrockCodeTimeAfterLeave;
-    private final int javaLimitPerDiscord;
-    private final int bedrockLimitPerDiscord;
-    private final boolean limitIncludeReserved;
-    private final boolean disallowSimultaneousPlay;
 
     public LoginService(OAuthPort oauth, DiscordDmPort dm,
                         AccountsRepo accounts, ProfileRepo profiles, TokensRepo tokens,
                         LoginStatePort state, Logger log,
                         String publicUrl, String redirectUri,
-                        DiscordUserRepo discordUserRepo,
-                        Plugin plugin,
+                        DiscordUserRepo discordUserRepo, Plugin plugin,
                         BanProgressRepo banProgressRepo,
-                        boolean bansEnabled,
-                        long banBaseSec, double banMultiplier,
-                        long banMaxSec, long banTrackWindowSec,
-                        String banReasonTpl,
-                        MessagesPort messages, int bedrockCodeTimeAfterLeave,
-                        int javaLimitPerDiscord,
-                        int bedrockLimitPerDiscord,
-                        boolean limitIncludeReserved,
-                        boolean disallowSimultaneousPlay) {
+                        PropertiesProvider propertiesProvider,
+                        MessagesPort messages) {
         this.oauth = oauth;
         this.dm = dm;
         this.accounts = accounts;
@@ -70,20 +57,7 @@ public class LoginService {
         this.msg = messages;
 
         this.banProgressRepo = banProgressRepo;
-        this.bansEnabled = bansEnabled;
-        this.banBaseSec = Math.max(1L, banBaseSec);
-        this.banMultiplier = banMultiplier <= 0 ? 2.0 : banMultiplier;
-        this.banMaxSec = Math.max(this.banBaseSec, banMaxSec);
-        this.banTrackWindowSec = Math.max(0L, banTrackWindowSec);
-        this.banReasonTpl = (banReasonTpl == null || banReasonTpl.isBlank())
-                ? "Suspicious login attempt. Ban: %DURATION%."
-                : banReasonTpl;
-        this.bedrockCodeTimeAfterLeave = bedrockCodeTimeAfterLeave;
-
-        this.javaLimitPerDiscord = Math.max(0, javaLimitPerDiscord);
-        this.bedrockLimitPerDiscord = Math.max(0, bedrockLimitPerDiscord);
-        this.limitIncludeReserved = limitIncludeReserved;
-        this.disallowSimultaneousPlay = disallowSimultaneousPlay;
+        this.propertiesProvider = propertiesProvider;
     }
 
     public void setDiscordDmPort(DiscordDmPort dm) { this.dm = dm; }
@@ -93,6 +67,7 @@ public class LoginService {
     public void onPlayerJoin(UUID uuid, String name, String currentIp, boolean bedrock) {
         profiles.upsertName(uuid, name);
         profiles.updatePlatform(uuid, bedrock ? "BEDROCK" : "JAVA");
+        Properties props = propertiesProvider.getSnapshot();
 
         // TODO: Probably no need to handle it twice
 //        long now = System.currentTimeMillis() / 1000;
@@ -107,7 +82,7 @@ public class LoginService {
         if (!accounts.isLinked(uuid)) {
             state.markPendingLogin(uuid, currentIp, bedrock);
             if (bedrock) {
-                String code = state.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(bedrockCodeTimeAfterLeave))
+                String code = state.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(props.bedrockCodeTimeAfterLeave))
                         .orElseGet(() -> state.createOneTimeCode(uuid, currentIp, name));
                 state.recordBedrockCodeShown(uuid, code);
                 Map<String, String> ph = Map.of("code", code);
@@ -170,6 +145,7 @@ public class LoginService {
         var st = state.consumeOAuthState(stateToken);
         var tokenSet = oauth.exchangeCode(code, redirectUri);
         var user = oauth.fetchUser(tokenSet.accessToken());
+        Properties props = propertiesProvider.getSnapshot();
 
         // Ensure Discord user exists before creating FK-dependent records
         if (discordUserRepo != null) {
@@ -187,9 +163,9 @@ public class LoginService {
         var cur = accounts.findDiscordForProfile(st.uuid());
         boolean bypass = state.consumeLimitBypass(st.uuid());
         if (!bypass && (cur.isEmpty() || cur.get() != user.id())) {
-            int limit = st.bedrock() ? bedrockLimitPerDiscord : javaLimitPerDiscord;
+            int limit = st.bedrock() ? props.bedrockLimitPerDiscord : props.javaLimitPerDiscord;
             if (limit > 0) {
-                int count = accounts.countByDiscordAndPlatform(user.id(), platform, limitIncludeReserved);
+                int count = accounts.countByDiscordAndPlatform(user.id(), platform, props.limitIncludeReserved);
                 if (count >= limit) {
                     throw new ForbiddenLinkException("Link limit reached for platform " + platform);
                 }
@@ -257,13 +233,14 @@ public class LoginService {
     public boolean onDiscordSlashLogin(String code, long discordUserId) {
         var pending = state.consumeOneTimeCode(code);
         if (pending == null) return false;
+        Properties props = propertiesProvider.getSnapshot();
 
         // Enforce Bedrock per-Discord limit before reserve
         boolean bypass = state.hasLimitBypass(pending.uuid());
         if (!bypass) {
-            int limit = bedrockLimitPerDiscord;
+            int limit = props.bedrockLimitPerDiscord;
             if (limit > 0) {
-                int count = accounts.countByDiscordAndPlatform(discordUserId, "BEDROCK", limitIncludeReserved);
+                int count = accounts.countByDiscordAndPlatform(discordUserId, "BEDROCK", props.limitIncludeReserved);
                 if (count >= limit) return false;
             }
         }
@@ -294,7 +271,8 @@ public class LoginService {
 
     // === Progressive bans (only ban_progress table) ===
     private long applyProgressiveBan(String ip) {
-        if (!bansEnabled || ip == null || ip.isBlank()) return 0L;
+        Properties props = propertiesProvider.getSnapshot();
+        if (!props.bansEnabled || ip == null || ip.isBlank()) return 0L;
 
         long now = System.currentTimeMillis() / 1000;
         var recOpt = banProgressRepo.findByIp(ip);
@@ -305,22 +283,22 @@ public class LoginService {
             var rec = recOpt.get();
             attempts = rec.attempts();
             lastAttempt = rec.lastAttemptEpochSec();
-            if (banTrackWindowSec > 0 && now - lastAttempt > banTrackWindowSec) {
+            if (props.banTrackWindowSec > 0 && now - lastAttempt > props.banTrackWindowSec) {
                 attempts = 0;
             }
         }
 
         attempts += 1;
-        double pow = Math.pow(banMultiplier, Math.max(0, attempts - 1));
-        long dur = (long) Math.floor(banBaseSec * pow);
-        if (dur > banMaxSec) dur = banMaxSec;
+        double pow = Math.pow(props.banMultiplier, Math.max(0, attempts - 1));
+        long dur = (long) Math.floor(props.banBaseSec * pow);
+        if (dur > props.banMaxSec) dur = props.banMaxSec;
 
         long untilSec = now + dur;
         banProgressRepo.upsert(ip, attempts, now, untilSec);
         return dur;
     }
 
-    // === UI & main-thread helpers ===
+    // === Components & main-thread helpers ===
     private void sendClickableAuth(UUID uuid, String text, String hover, String loginUrl) {
         runPlayer(uuid, p -> {
             Component comp = Component.text(text)
@@ -382,7 +360,8 @@ public class LoginService {
 
     // Check at login time whether the player should be disallowed (e.g., simultaneous play)
     public Optional<String> disallowReasonOnLogin(UUID uuid, String name, String currentIp, boolean bedrock) {
-        if (!disallowSimultaneousPlay) return Optional.empty();
+        Properties props = propertiesProvider.getSnapshot();
+        if (!props.disallowSimultaneousPlay) return Optional.empty();
         var owner = accounts.findDiscordForProfile(uuid);
         if (owner.isEmpty()) return Optional.empty();
         long discordId = owner.get();

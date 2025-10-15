@@ -236,7 +236,6 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
     private void handleReload(CommandSender sender) {
         if (!sender.hasPermission("logdo2.admin.reload")) { noPerm(sender); return; }
-        plugin.reloadConfig();
         Config.reload();
         if (msg instanceof YamlMessages ym) ym.reload();
         sender.sendMessage("§aLogDO2 configuration reloaded!");

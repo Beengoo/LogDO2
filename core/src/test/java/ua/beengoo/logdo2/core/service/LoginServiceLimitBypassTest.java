@@ -2,6 +2,8 @@ package ua.beengoo.logdo2.core.service;
 
 import org.junit.jupiter.api.Test;
 import ua.beengoo.logdo2.api.ports.*;
+import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -10,6 +12,18 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LoginServiceLimitBypassTest {
+
+    private static final PropertiesProvider props = new PropertiesProvider() {
+        @Override
+        public ua.beengoo.logdo2.api.provider.Properties getSnapshot() {
+            return new Properties(
+                    60,
+                    1, 1,
+                    true, true, 0, 2, 4, 100,
+                    true
+            );
+        }
+    };
 
     private static final MessagesPort MSG = new MessagesPort() {
         @Override public String raw(String path) { return path; }
@@ -77,7 +91,7 @@ class LoginServiceLimitBypassTest {
 
     @Test
     void slashLoginBlocksWhenAtLimitWithoutBypass() {
-        var state = new LoginStateService(Duration.ofSeconds(60));
+        var state = new LoginStateService(props);
         var profiles = new FakeProfileRepo();
         var accounts = new FakeAccountsRepo(profiles);
 
@@ -91,16 +105,8 @@ class LoginServiceLimitBypassTest {
                 "http://x", "http://x/cb",
                 null,
                 null,
-                null,
-                false,
-                10, 2.0, 100, 100,
-                "",
-                MSG,
-                60,
-                1,
-                1,
-                true,
-                false);
+                null,props,
+                MSG);
 
         // Prepare a pending code for a different profile
         UUID target = UUID.randomUUID();
@@ -112,7 +118,7 @@ class LoginServiceLimitBypassTest {
 
     @Test
     void slashLoginAllowsWithBypassEvenAtLimit() {
-        var state = new LoginStateService(Duration.ofSeconds(60));
+        var state = new LoginStateService(props);
         var profiles = new FakeProfileRepo();
         var accounts = new FakeAccountsRepo(profiles);
 
@@ -126,16 +132,8 @@ class LoginServiceLimitBypassTest {
                 "http://x", "http://x/cb",
                 null,
                 null,
-                null,
-                false,
-                10, 2.0, 100, 100,
-                "",
-                MSG,
-                60,
-                1,
-                1,
-                true,
-                false);
+                null,props,
+                MSG);
 
         UUID target = UUID.randomUUID();
         state.grantLimitBypass(target);
@@ -147,7 +145,13 @@ class LoginServiceLimitBypassTest {
 
     @Test
     void reservedDoesNotCountWhenIncludeReservedFalse() {
-        var state = new LoginStateService(Duration.ofSeconds(60));
+        PropertiesProvider props = () -> new Properties(
+                60,
+                1, 1,
+                false, true, 0, 2, 4, 100,
+                true
+        );
+        var state = new LoginStateService(props);
         var profiles = new FakeProfileRepo();
         var accounts = new FakeAccountsRepo(profiles);
 
@@ -162,15 +166,8 @@ class LoginServiceLimitBypassTest {
                 null,
                 null,
                 null,
-                false,
-                10, 2.0, 100, 100,
-                "",
-                MSG,
-                60,
-                1,
-                1,
-                false, // includeReserved = false
-                false);
+                props,
+                MSG);
 
         UUID target = UUID.randomUUID();
         String code = state.createOneTimeCode(target, "1.1.1.1", "Test");
@@ -181,7 +178,7 @@ class LoginServiceLimitBypassTest {
 
     @Test
     void reservedCountsWhenIncludeReservedTrue() {
-        var state = new LoginStateService(Duration.ofSeconds(60));
+        var state = new LoginStateService(props);
         var profiles = new FakeProfileRepo();
         var accounts = new FakeAccountsRepo(profiles);
 
@@ -196,15 +193,8 @@ class LoginServiceLimitBypassTest {
                 null,
                 null,
                 null,
-                false,
-                10, 2.0, 100, 100,
-                "",
-                MSG,
-                60,
-                1,
-                1,
-                true, // includeReserved = true
-                false);
+                props,
+                MSG);
 
         UUID target = UUID.randomUUID();
         String code = state.createOneTimeCode(target, "1.1.1.1", "Test");

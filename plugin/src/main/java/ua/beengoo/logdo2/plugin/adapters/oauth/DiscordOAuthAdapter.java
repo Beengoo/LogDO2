@@ -22,7 +22,7 @@ public class DiscordOAuthAdapter implements OAuthPort {
     private final ObjectMapper om = new ObjectMapper();
     private final String clientId;
     private final String clientSecret;
-    private final String scopesCfg; // наприклад: "identify email applications.commands"
+    private final String scopesCfg; // for example: "identify email applications.commands"
 
     public DiscordOAuthAdapter(Logger log, String clientId, String clientSecret, String scopes) {
         this.log = log;

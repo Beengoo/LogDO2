@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.bukkit.configuration.file.FileConfiguration;
 import ua.beengoo.logdo2.plugin.LogDO2;
+import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
 
 @Slf4j
 public class Config {
@@ -15,11 +16,15 @@ public class Config {
         plugin = p;
         updateConfigDefaults();
         fileConfiguration = p.getConfig();
+        LogDO2PropertiesManager.getINSTANCE().initFrom(plugin);
     }
 
     public static void reload() {
         fileConfiguration = plugin.getConfig();
+        LogDO2PropertiesManager.getINSTANCE().reload(plugin);
     }
+
+
 
     public static void updateConfigDefaults() {
         try {

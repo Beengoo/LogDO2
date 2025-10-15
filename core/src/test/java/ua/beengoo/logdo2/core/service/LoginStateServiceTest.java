@@ -1,15 +1,30 @@
 package ua.beengoo.logdo2.core.service;
 
 import org.junit.jupiter.api.Test;
+import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class LoginStateServiceTest {
+
+    private static final PropertiesProvider props = new PropertiesProvider() {
+        @Override
+        public ua.beengoo.logdo2.api.provider.Properties getSnapshot() {
+            return new Properties(
+                    1,
+                    1, 1,
+                    true, true, 0, 2, 4, 100,
+                    true
+            );
+        }
+    };
+
     @Test
     void createAndConsumeOAuthState() {
-        var svc = new LoginStateService();
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         String token = svc.createOAuthState(uuid, "1.2.3.4", "Steve", false);
 
@@ -24,7 +39,7 @@ class LoginStateServiceTest {
 
     @Test
     void oneTimeCodeIsUniqueAndConsumable() {
-        var svc = new LoginStateService();
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         String code = svc.createOneTimeCode(uuid, "1.2.3.4", "Alex");
 
@@ -34,7 +49,7 @@ class LoginStateServiceTest {
 
     @Test
     void pendingLoginAndIpFlags() {
-        var svc = new LoginStateService();
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         svc.markPendingLogin(uuid, "1.2.3.4", false);
         assertTrue(svc.isPendingLogin(uuid));
@@ -49,7 +64,7 @@ class LoginStateServiceTest {
 
     @Test
     void recentBedrockCodeAfterLeaveIsResent() {
-        var svc = new LoginStateService();
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         // Create a code (also records shown)
         String code = svc.createOneTimeCode(uuid, "1.2.3.4", "Alex");
@@ -63,7 +78,7 @@ class LoginStateServiceTest {
 
     @Test
     void limitBypassGrantHasConsumeCycle() {
-        var svc = new LoginStateService();
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         assertFalse(svc.hasLimitBypass(uuid));
         assertFalse(svc.consumeLimitBypass(uuid));
@@ -77,7 +92,7 @@ class LoginStateServiceTest {
 
     @Test
     void recentBedrockCodeExpiresAfterMaxAge() throws Exception {
-        var svc = new LoginStateService();
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         svc.createOneTimeCode(uuid, "1.2.3.4", "Alex");
         svc.recordBedrockLeave(uuid);
@@ -88,11 +103,11 @@ class LoginStateServiceTest {
 
     @Test
     void bedrockCodeCannotBeConsumedAfterReuseWindow() throws Exception {
-        var svc = new LoginStateService(java.time.Duration.ofMillis(10));
+        var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
         String code = svc.createOneTimeCode(uuid, "1.2.3.4", "Alex");
         svc.recordBedrockLeave(uuid);
-        Thread.sleep(15);
+        Thread.sleep(1015);
         assertNull(svc.consumeOneTimeCode(code));
     }
 }
