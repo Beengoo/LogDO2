@@ -11,6 +11,10 @@ import ua.beengoo.logdo2.api.ports.BanProgressRepo;
 import ua.beengoo.logdo2.api.ports.MessagesPort;
 import ua.beengoo.logdo2.api.ports.ProfileRepo;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.plugin.LogDO2;
+import ua.beengoo.logdo2.plugin.config.Config;
+import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
+import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.net.InetAddress;
 import java.util.*;
@@ -19,19 +23,21 @@ import java.util.stream.Collectors;
 public class LogDO2Command implements CommandExecutor, TabCompleter {
     private static final List<String> SUBS = List.of("help", "link", "logout", "forgive", "bypass", "reload");
 
+    private final LogDO2 plugin;
     private final LoginService loginService;
     private final AccountsRepo accountsRepo;
     private final ProfileRepo profileRepo;
     private final BanProgressRepo banProgressRepo;
     private final MessagesPort msg;
-    private final ua.beengoo.logdo2.plugin.util.AuditLogger audit;
+    private final AuditLogger audit;
 
-    public LogDO2Command(LoginService loginService,
+    public LogDO2Command(LogDO2 plugin,LoginService loginService,
                          AccountsRepo accountsRepo,
                          ProfileRepo profileRepo,
                          BanProgressRepo banProgressRepo,
                          MessagesPort msg,
-                         ua.beengoo.logdo2.plugin.util.AuditLogger audit) {
+                         AuditLogger audit) {
+        this.plugin = plugin;
         this.loginService = loginService;
         this.accountsRepo = accountsRepo;
         this.profileRepo = profileRepo;
@@ -230,12 +236,9 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
     private void handleReload(CommandSender sender) {
         if (!sender.hasPermission("logdo2.admin.reload")) { noPerm(sender); return; }
-        var pl = Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("LogDO2"));
-        pl.reloadConfig();
-        if (pl instanceof ua.beengoo.logdo2.plugin.LogDO2 main) {
-            main.updateConfigDefaults(); // merge any new defaults into existing file
-        }
-        if (msg instanceof ua.beengoo.logdo2.plugin.i18n.YamlMessages ym) ym.reload();
+        plugin.reloadConfig();
+        Config.reload();
+        if (msg instanceof YamlMessages ym) ym.reload();
         sender.sendMessage("§aLogDO2 configuration reloaded!");
         if (audit != null) audit.log("admin", "reload", java.util.Map.of(
                 "sender", sender.getName()

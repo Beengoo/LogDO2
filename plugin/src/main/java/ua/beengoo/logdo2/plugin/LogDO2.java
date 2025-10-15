@@ -20,6 +20,7 @@ import ua.beengoo.logdo2.plugin.adapters.discord.JdaDiscordDmAdapter;
 import ua.beengoo.logdo2.plugin.adapters.jdbc.*;
 import ua.beengoo.logdo2.plugin.adapters.oauth.DiscordOAuthAdapter;
 import ua.beengoo.logdo2.plugin.command.LogDO2Command;
+import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
 import ua.beengoo.logdo2.plugin.discord.JdaDiscordButtonListener;
 import ua.beengoo.logdo2.plugin.discord.JdaSlashLoginListener;
@@ -68,8 +69,7 @@ public final class LogDO2 extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        // Merge any new default keys into existing config.yml (non-destructive for user values)
-        updateConfigDefaults();
+        Config.updateConfigDefaults();
         this.messages = new YamlMessages(this);
 
         int    webPort      = getConfig().getInt("web.port", 8080);
@@ -223,7 +223,7 @@ public final class LogDO2 extends JavaPlugin {
         );
         this.loginEndpoint.start(webPort);
 
-        LogDO2Command cmd = new LogDO2Command(loginService, accountsRepo, profileRepo, banProgressRepo, messages, audit);
+        LogDO2Command cmd = new LogDO2Command(this, loginService, accountsRepo, profileRepo, banProgressRepo, messages, audit);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 
@@ -267,33 +267,5 @@ public final class LogDO2 extends JavaPlugin {
         if (db != null) db.stop();
         if (audit != null) try { audit.close(); } catch (Exception ignored) {}
         log.info("LogDO2 disabled, bye-bye!");
-    }
-
-    public void updateConfigDefaults() {
-        try {
-            java.io.InputStream in = getResource("config.yml");
-            if (in == null) return;
-            String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            org.bukkit.configuration.file.YamlConfiguration defaults = new org.bukkit.configuration.file.YamlConfiguration();
-            defaults.loadFromString(text);
-
-            java.io.File file = new java.io.File(getDataFolder(), "config.yml");
-            org.bukkit.configuration.file.YamlConfiguration cfg = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
-
-            boolean changed = false;
-            for (String key : defaults.getKeys(true)) {
-                // Only add keys that are truly missing from file (ignore defaults)
-                if (!cfg.isSet(key)) {
-                    cfg.set(key, defaults.get(key));
-                    changed = true;
-                }
-            }
-            if (changed) {
-                cfg.save(file);
-                reloadConfig();
-            }
-        } catch (Exception e) {
-            log.warn("Failed to marge default config", e);
-        }
     }
 }
