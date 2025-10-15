@@ -94,15 +94,15 @@ public class LoginService {
         profiles.upsertName(uuid, name);
         profiles.updatePlatform(uuid, bedrock ? "BEDROCK" : "JAVA");
 
-        // страховка якщо PreLogin не спрацював
-        long now = System.currentTimeMillis() / 1000;
-        var rec = banProgressRepo.findByIp(currentIp);
-        if (rec.isPresent() && rec.get().lastBanUntilEpochSec() > now) {
-            long remain = rec.get().lastBanUntilEpochSec() - now;
-            Map<String, String> phb = Map.of("remaining", humanDuration(remain));
-            kick(uuid, msg.mc("prelogin.banned", phb));
-            return;
-        }
+        // TODO: Probably no need to handle it twice
+//        long now = System.currentTimeMillis() / 1000;
+//        var rec = banProgressRepo.findByIp(currentIp);
+//        if (rec.isPresent() && rec.get().lastBanUntilEpochSec() > now) {
+//            long remain = rec.get().lastBanUntilEpochSec() - now;
+//            Map<String, String> phb = Map.of("remaining", humanDuration(remain));
+//            kick(uuid, msg.mc("prelogin.banned", phb));
+//            return;
+//        }
 
         if (!accounts.isLinked(uuid)) {
             state.markPendingLogin(uuid, currentIp, bedrock);
@@ -136,8 +136,6 @@ public class LoginService {
             firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
             return;
         }
-
-        // Simultaneous-play prevention is handled earlier at PlayerLoginEvent to be Folia-safe
 
         sendActionBar(uuid, msg.mc("login.linked.actionbar"));
     }
