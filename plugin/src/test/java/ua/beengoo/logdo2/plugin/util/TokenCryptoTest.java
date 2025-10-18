@@ -18,7 +18,7 @@ class TokenCryptoTest {
     @Test
     void roundTripAndRandomIv() {
         var keyB64 = randomKeyB64();
-        var crypto = TokenCrypto.fromBase64(keyB64);
+        var crypto = EncryptionManager.fromBase64(keyB64);
 
         byte[] plain = "hello world".getBytes();
         byte[] c1 = crypto.encrypt(plain);
@@ -33,12 +33,12 @@ class TokenCryptoTest {
     void invalidKeyLengthThrows() {
         byte[] sixteen = new byte[16];
         String bad = Base64.getEncoder().encodeToString(sixteen);
-        assertThrows(IllegalArgumentException.class, () -> TokenCrypto.fromBase64(bad));
+        assertThrows(IllegalArgumentException.class, () -> EncryptionManager.fromBase64(bad));
     }
 
     @Test
     void tamperDetection() {
-        var crypto = TokenCrypto.fromBase64(randomKeyB64());
+        var crypto = EncryptionManager.fromBase64(randomKeyB64());
         byte[] enc = crypto.encrypt("secret".getBytes());
         enc[enc.length - 1] ^= 0x01; // flip a bit
         assertThrows(RuntimeException.class, () -> crypto.decrypt(enc));
