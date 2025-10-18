@@ -30,6 +30,7 @@ import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.listeners.PlayerListener;
 import ua.beengoo.logdo2.plugin.listeners.PreLoginListener;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
+import ua.beengoo.logdo2.plugin.listeners.ReloadListener;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
 import ua.beengoo.logdo2.plugin.util.EnumsUtil;
@@ -48,6 +49,7 @@ import java.util.Objects;
 @Slf4j
 public final class LogDO2 extends JavaPlugin {
     private JDA jda;
+    @Getter
     private LoginEndpoint loginEndpoint;
     private TimeoutManager timeouts;
     private AuditLogger audit;
@@ -135,9 +137,6 @@ public final class LogDO2 extends JavaPlugin {
                 LogDO2PropertiesManager.getINSTANCE(),
                 messages
         );
-
-
-
         // Discord
         var jdaBuilder = JDABuilder.createDefault(
                         botToken,
@@ -218,6 +217,7 @@ public final class LogDO2 extends JavaPlugin {
         if (floodgate.isPresent()) log.info("Floodgate is supported!");
         Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages, audit), this);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this, audit), this);
+        Bukkit.getPluginManager().registerEvents(new ReloadListener(this), this);
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,
                 Duration.ofSeconds(loginSec),
@@ -236,7 +236,7 @@ public final class LogDO2 extends JavaPlugin {
         // Register public services for integrations (read-only)
         var sm = getServer().getServicesManager();
         sm.register(ProfileReadPort.class, new ProfileReadAdapter(profileRepo), this, ServicePriority.Normal);
-        sm.register(ua.beengoo.logdo2.api.ports.AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
+        sm.register(AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
         sm.register(LogDO2Api.class, new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda, targetGuildId), this, ServicePriority.Normal);
         // Expose LoginStatePort for admin commands or integrations that need temporary flags
         sm.register(LoginStatePort.class, loginStatePort, this, ServicePriority.Normal);

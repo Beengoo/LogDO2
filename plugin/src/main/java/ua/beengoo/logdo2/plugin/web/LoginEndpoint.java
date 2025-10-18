@@ -11,7 +11,9 @@ import net.dv8tion.jda.api.requests.restaction.InviteAction;
 import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.ForbiddenLinkException;
+import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
+import java.util.Map;
 import java.util.logging.Logger;
 
 @Slf4j
@@ -25,7 +27,7 @@ public class LoginEndpoint {
     private final String targetGuildId;
     private final String inviteChannelId;
     private Javalin app;
-    private final ua.beengoo.logdo2.plugin.util.AuditLogger audit;
+    private final AuditLogger audit;
 
     public LoginEndpoint(Logger logger, LoginService loginService,
                          JDA jda,
@@ -34,7 +36,7 @@ public class LoginEndpoint {
                          String redirectUrl,
                          String targetGuildId,
                          String inviteChannelId,
-                         ua.beengoo.logdo2.plugin.util.AuditLogger audit) {
+                         AuditLogger audit) {
         this.logger = logger;
         this.loginService = loginService;
         this.jda = jda;
@@ -55,6 +57,13 @@ public class LoginEndpoint {
 
     public void stop() {
         if (app != null) app.stop();
+    }
+
+    public void restart(int port){
+        if (app != null && app.port() != port) {
+            app.stop();
+            start(port);
+        }
     }
 
     private void handleLogin(@NotNull Context ctx) {
@@ -89,7 +98,7 @@ public class LoginEndpoint {
         }
         try {
             loginService.onOAuthCallback(code, state);
-            if (audit != null) audit.log("web", "oauth_callback_ok", java.util.Map.of(
+            if (audit != null) audit.log("web", "oauth_callback_ok", Map.of(
                     "state", state
             ));
             switch (postAction) {
@@ -99,7 +108,7 @@ public class LoginEndpoint {
                                 ? postText
                                 : "Login complete. You can return to the game.");
                     } else {
-                        if (audit != null) audit.log("web", "post_redirect", java.util.Map.of("url", redirectUrl));
+                        if (audit != null) audit.log("web", "post_redirect", Map.of("url", redirectUrl));
                         ctx.redirect(redirectUrl);
                     }
                     break;
@@ -113,14 +122,14 @@ public class LoginEndpoint {
                             : "Discord account linked. You can return to the game.");
             }
         } catch (ForbiddenLinkException ex) {
-            if (audit != null) audit.log("web", "oauth_callback_forbidden", java.util.Map.of(
+            if (audit != null) audit.log("web", "oauth_callback_forbidden", Map.of(
                     "state", state,
                     "error", ex.getMessage() == null ? "forbidden" : ex.getMessage()
             ));
             ctx.status(403).result("Forbidden: profile reserved for another Discord account");
         } catch (Exception ex) {
             log.error("Unexpected error while login handle", ex);
-            if (audit != null) audit.log("web", "oauth_callback_error", java.util.Map.of(
+            if (audit != null) audit.log("web", "oauth_callback_error", Map.of(
                     "state", state,
                     "error", ex.getMessage() == null ? "error" : ex.getMessage()
             ));
@@ -171,7 +180,7 @@ public class LoginEndpoint {
                 Invite inv = action.complete();
                 url = inv.getUrl();
             }
-            if (audit != null) audit.log("web", "post_discord_invite", java.util.Map.of(
+            if (audit != null) audit.log("web", "post_discord_invite", Map.of(
                     "guild", targetGuildId,
                     "channel", inviteChannelId,
                     "url", url
@@ -179,7 +188,7 @@ public class LoginEndpoint {
             ctx.redirect(url);
         } catch (Exception e) {
             log.warn("Unable to retrieve invite link", e);
-            if (audit != null) audit.log("web", "post_discord_invite_error", java.util.Map.of(
+            if (audit != null) audit.log("web", "post_discord_invite_error", Map.of(
                     "guild", targetGuildId,
                     "channel", inviteChannelId,
                     "error", e.getMessage() == null ? "error" : e.getMessage()

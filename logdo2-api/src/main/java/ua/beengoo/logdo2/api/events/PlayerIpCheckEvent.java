@@ -1,11 +1,13 @@
 package ua.beengoo.logdo2.api.events;
 
+import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 
+@Getter
 public class PlayerIpCheckEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
 
@@ -19,10 +21,6 @@ public class PlayerIpCheckEvent extends Event {
         this.allowed = defaultAllowed;
     }
 
-    public Player getPlayer() { return player; }
-    public String getCurrentIp() { return currentIp; }
-
-    public boolean isAllowed() { return allowed; }
     public void setAllowed(boolean allowed) { this.allowed = allowed; }
 
     @Override public @NotNull HandlerList getHandlers() { return HANDLERS; }

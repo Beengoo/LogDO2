@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.api.events;
 
+import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -9,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
  * Fired after login gating is evaluated for a player.
  * Notify-only: listeners must not change the result.
  */
+@Getter
 public class PlayerPostLoginCheckEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
 
@@ -26,12 +28,6 @@ public class PlayerPostLoginCheckEvent extends Event {
         this.allowed = allowed;
         this.reason = reason;
     }
-
-    public Player getPlayer() { return player; }
-    public String getIp() { return ip; }
-    public boolean isBedrock() { return bedrock; }
-    public boolean isAllowed() { return allowed; }
-    public String getReason() { return reason; }
 
     @Override public @NotNull HandlerList getHandlers() { return HANDLERS; }
     public static @NotNull HandlerList getHandlerList() { return HANDLERS; }

@@ -1,10 +1,12 @@
 package ua.beengoo.logdo2.api.events;
 
+import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
+@Getter
 public class PlayerLoginPhaseEnterEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
 
@@ -15,9 +17,6 @@ public class PlayerLoginPhaseEnterEvent extends Event {
         this.player = player;
         this.phase = phase;
     }
-
-    public Player getPlayer() { return player; }
-    public LoginPhase getPhase() { return phase; }
 
     @Override public @NotNull HandlerList getHandlers() { return HANDLERS; }
     public static @NotNull HandlerList getHandlerList() { return HANDLERS; }

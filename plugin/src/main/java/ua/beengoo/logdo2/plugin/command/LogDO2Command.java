@@ -6,6 +6,7 @@ import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import ua.beengoo.logdo2.api.events.LogDO2ReloadEvent;
 import ua.beengoo.logdo2.api.ports.AccountsRepo;
 import ua.beengoo.logdo2.api.ports.BanProgressRepo;
 import ua.beengoo.logdo2.api.ports.MessagesPort;
@@ -238,6 +239,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("logdo2.admin.reload")) { noPerm(sender); return; }
         Config.reload();
         if (msg instanceof YamlMessages ym) ym.reload();
+        Bukkit.getPluginManager().callEvent(new LogDO2ReloadEvent());
         sender.sendMessage("§aLogDO2 configuration reloaded!");
         if (audit != null) audit.log("admin", "reload", java.util.Map.of(
                 "sender", sender.getName()

@@ -6,6 +6,8 @@ import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import ua.beengoo.logdo2.api.events.LoginPhase;
+import ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.api.provider.Properties;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
@@ -207,11 +209,11 @@ public class LoginService {
         // Fire Bukkit event for integrations (main thread, only if player online)
         runPlayer(profileUuid, p -> {
             try {
-                org.bukkit.Bukkit.getPluginManager()
-                        .callEvent(new ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent(p, pending.newIp()));
+                Bukkit.getPluginManager()
+                        .callEvent(new PlayerIpConfirmedEvent(p, pending.newIp()));
             } catch (Throwable ignored) {}
         });
-        firePhaseExit(profileUuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
+        firePhaseExit(profileUuid, LoginPhase.IP_CONFIRM);
     }
 
     public void onDiscordIpReject(UUID profileUuid, long discordUserId) {

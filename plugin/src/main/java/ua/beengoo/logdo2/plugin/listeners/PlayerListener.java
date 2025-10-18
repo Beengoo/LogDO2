@@ -7,6 +7,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.plugin.Plugin;
+import ua.beengoo.logdo2.api.events.PlayerIpCheckEvent;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
@@ -146,8 +147,8 @@ public class PlayerListener implements Listener {
         boolean coreAllowed = loginService.isActionAllowed(p.getUniqueId(), ip);
         // Notify listeners about the check (notify-only; decision stays as coreAllowed)
         try {
-            org.bukkit.Bukkit.getPluginManager().callEvent(
-                    new ua.beengoo.logdo2.api.events.PlayerIpCheckEvent(p, ip, coreAllowed)
+            Bukkit.getPluginManager().callEvent(
+                    new PlayerIpCheckEvent(p, ip, coreAllowed)
             );
         } catch (Throwable ignored) {}
         if (coreAllowed) return true;
