@@ -33,9 +33,9 @@ import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.listeners.ReloadListener;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
+import ua.beengoo.logdo2.plugin.util.EncryptionManager;
 import ua.beengoo.logdo2.plugin.util.EnumsUtil;
 import ua.beengoo.logdo2.plugin.util.StringUtil;
-import ua.beengoo.logdo2.plugin.util.TokenCrypto;
 import ua.beengoo.logdo2.plugin.web.LoginEndpoint;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
 import ua.beengoo.logdo2.plugin.adapters.api.AccountsReadAdapter;
@@ -107,7 +107,7 @@ public final class LogDO2 extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        TokenCrypto crypto = TokenCrypto.fromBase64(keyB64);
+        EncryptionManager crypto = EncryptionManager.fromBase64(keyB64);
 
         // Repos
         this.accountsRepo    = new JdbcAccountsRepo(db.dataSource(), db.dialect());
@@ -137,36 +137,8 @@ public final class LogDO2 extends JavaPlugin {
                 LogDO2PropertiesManager.getINSTANCE(),
                 messages
         );
-        // Discord
-        var jdaBuilder = JDABuilder.createDefault(
-                        botToken,
-                        EnumsUtil.parseEnums(GatewayIntent.class, intentNames)
-                )
-                .addEventListeners(
-                        new JdaSlashLoginListener(loginService, getLogger(), messages, audit),
-                        new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger(), audit),
-                        new ListenerAdapter() {
-                            @Override public void onReady(@NotNull ReadyEvent event) {
-                                SlashCommandRegistrar.register(jda);
-                                // Install default DM adapter only if no external provider was set earlier
-                                if (discordDmPort == null) {
-                                    discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, LogDO2.this);
-                                    loginService.setDiscordDmPort(discordDmPort);
-                                } else {
-                                    log.info("External DM adapter used.");
-                                }
-                            }
-                        }
-                );
 
-        if (enableCacheChunking) {
-            jdaBuilder.setMemberCachePolicy(MemberCachePolicy.ALL);
-        }
-        if (cacheAllGuildMembers) {
-            jdaBuilder.setChunkingFilter(ChunkingFilter.ALL);
-        }
-
-        this.jda = jdaBuilder.build();
+        startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
 
         // Discord DM adapter (prefer external provider if present)
         DiscordDmPort externalDm = getServer().getServicesManager().load(DiscordDmPort.class);
@@ -244,13 +216,58 @@ public final class LogDO2 extends JavaPlugin {
         log.info("Using SQL dialect: {}", db.dialect());
         log.info("LogDO2 is ready!");
     }
+    public void startJDA(String botToken, List<String> intentNames,
+                        boolean enableCacheChunking, boolean cacheAllGuildMembers
+    ){
+        var jdaBuilder = JDABuilder.createDefault(
+                        botToken,
+                        EnumsUtil.parseEnums(GatewayIntent.class, intentNames)
+                )
+                .addEventListeners(
+                        new JdaSlashLoginListener(loginService, getLogger(), messages, audit),
+                        new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger(), audit),
+                        new ListenerAdapter() {
+                            @Override public void onReady(@NotNull ReadyEvent event) {
+                                SlashCommandRegistrar.register(jda);
+                                // Install default DM adapter only if no external provider was set earlier
+                                if (discordDmPort == null) {
+                                    discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, LogDO2.this);
+                                    loginService.setDiscordDmPort(discordDmPort);
+                                } else {
+                                    log.info("External DM adapter used.");
+                                }
+                            }
+                        }
+                );
+
+        if (enableCacheChunking) {
+            jdaBuilder.setMemberCachePolicy(MemberCachePolicy.ALL);
+        }
+        if (cacheAllGuildMembers) {
+            jdaBuilder.setChunkingFilter(ChunkingFilter.ALL);
+        }
+        this.jda = jdaBuilder.build();
+    }
+
+    private void shutdownJDA(){
+        if (jda != null) jda.shutdown();
+    }
+
+    public void restartJDA(String botToken, List<String> intentNames,
+                            boolean enableCacheChunking, boolean cacheAllGuildMembers){
+        shutdownJDA();
+        if (jda == null) {
+            jda = null;
+        }
+        startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
+    }
 
     @Override
     public void onDisable() {
         if (timeouts != null) timeouts.stop();
         if (loginEndpoint != null) loginEndpoint.stop();
-        if (jda != null) jda.shutdownNow();
         if (db != null) db.stop();
+        shutdownJDA();
         if (audit != null) try { audit.close(); } catch (Exception ignored) {}
         log.info("LogDO2 disabled, bye-bye!");
     }

@@ -7,7 +7,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 import java.util.Base64;
 
-public final class TokenCrypto {
+public final class EncryptionManager {
     private static final String ALG = "AES/GCM/NoPadding";
     private static final int GCM_TAG_BITS = 128;
     private static final int IV_LEN = 12;
@@ -15,12 +15,12 @@ public final class TokenCrypto {
 
     private final SecretKey key;
 
-    private TokenCrypto(SecretKey key) { this.key = key; }
+    private EncryptionManager(SecretKey key) { this.key = key; }
 
-    public static TokenCrypto fromBase64(String base64) {
+    public static EncryptionManager fromBase64(String base64) {
         byte[] raw = Base64.getDecoder().decode(base64);
         if (raw.length != 32) throw new IllegalArgumentException("tokenEncryptionKeyBase64 must be 32 bytes");
-        return new TokenCrypto(new SecretKeySpec(raw, "AES"));
+        return new EncryptionManager(new SecretKeySpec(raw, "AES"));
     }
 
     public byte[] encrypt(byte[] plain) {

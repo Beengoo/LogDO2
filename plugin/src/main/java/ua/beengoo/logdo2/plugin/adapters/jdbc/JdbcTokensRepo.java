@@ -2,7 +2,7 @@ package ua.beengoo.logdo2.plugin.adapters.jdbc;
 
 import ua.beengoo.logdo2.api.ports.TokensRepo;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
-import ua.beengoo.logdo2.plugin.util.TokenCrypto;
+import ua.beengoo.logdo2.plugin.util.EncryptionManager;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
@@ -12,10 +12,10 @@ import java.util.Optional;
 
 public class JdbcTokensRepo implements TokensRepo {
     private final DataSource ds;
-    private final TokenCrypto crypto;
+    private final EncryptionManager crypto;
     private final DatabaseManager.Dialect dialect;
 
-    public JdbcTokensRepo(DataSource ds, TokenCrypto crypto, DatabaseManager.Dialect dialect) {
+    public JdbcTokensRepo(DataSource ds, EncryptionManager crypto, DatabaseManager.Dialect dialect) {
         this.ds = ds; this.crypto = crypto; this.dialect = dialect;
     }
 

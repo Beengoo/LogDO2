@@ -17,6 +17,10 @@ public class ReloadListener implements Listener {
     @EventHandler
     public void onPluginReload(LogDO2ReloadEvent event) {
         logDO2.getLoginEndpoint().restart(Config.getFileConfiguration().getInt("web.port"));
+        logDO2.restartJDA(Config.getFileConfiguration().getString("discord.botToken"),
+                Config.getFileConfiguration().getStringList("discord.intents"),
+                Config.getFileConfiguration().getBoolean("discord.enableCacheChunking"),
+                Config.getFileConfiguration().getBoolean("discord.cacheAllGuildMembers"));
     }
 
 }
