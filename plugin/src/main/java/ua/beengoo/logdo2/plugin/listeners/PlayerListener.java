@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.events.PlayerIpCheckEvent;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
@@ -169,7 +170,7 @@ public class PlayerListener implements Listener {
             case DAMAGE -> base + "damage";
         };
         boolean def = (action == Action.DAMAGE); // allow damage by default, block others
-        return plugin != null && plugin.getConfig().getBoolean(key, def);
+        return plugin != null && Config.getFileConfiguration().getBoolean(key, def);
     }
 
     private Phase getPhase(Player p) {
@@ -189,10 +190,10 @@ public class PlayerListener implements Listener {
         if (phase == null) return true;
 
         String base = (phase == Phase.LOGIN) ? "gates.login." : "gates.ipConfirm.";
-        boolean commandsToggle = plugin != null && plugin.getConfig().getBoolean(base + "commands", false);
+        boolean commandsToggle = plugin != null && Config.getFileConfiguration().getBoolean(base + "commands", false);
         if (commandsToggle) return true; // all commands allowed in this phase
 
-        var list = (plugin != null) ? plugin.getConfig().getStringList(base + "commandsAllowed") : java.util.List.<String>of();
+        var list = (plugin != null) ? Config.getFileConfiguration().getStringList(base + "commandsAllowed") : java.util.List.<String>of();
         String cmd = (rootCmd == null ? "" : rootCmd).toLowerCase(java.util.Locale.ROOT);
         for (String s : list) {
             if (cmd.equalsIgnoreCase(s)) return true;
@@ -235,8 +236,8 @@ public class PlayerListener implements Listener {
             return;
         }
         String base = (phase == Phase.LOGIN) ? "gates.login." : "gates.ipConfirm.";
-        boolean blind = plugin.getConfig().getBoolean(base + "blindness", false);
-        boolean hide = plugin.getConfig().getBoolean(base + "hidePlayers", false);
+        boolean blind = Config.getFileConfiguration().getBoolean(base + "blindness", false);
+        boolean hide = Config.getFileConfiguration().getBoolean(base + "hidePlayers", false);
         if (blind) applyBlindness(p); else clearBlindness(p);
         if (hide) hideOthers(p); else showOthers(p);
     }
