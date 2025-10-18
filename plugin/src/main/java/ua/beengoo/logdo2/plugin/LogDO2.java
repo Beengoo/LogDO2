@@ -48,6 +48,7 @@ import java.util.Objects;
 
 @Slf4j
 public final class LogDO2 extends JavaPlugin {
+    @Getter
     private JDA jda;
     @Getter
     private LoginEndpoint loginEndpoint;
@@ -71,6 +72,8 @@ public final class LogDO2 extends JavaPlugin {
 
     private DatabaseManager db;
     private FloodgateHook floodgate;
+    @Getter
+    private LogDO2ApiImpl logdo2API;
 
     @Override
     public void onEnable() {
@@ -180,6 +183,8 @@ public final class LogDO2 extends JavaPlugin {
         );
         this.loginEndpoint.start(webPort);
 
+        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda, targetGuildId);
+
         LogDO2Command cmd = new LogDO2Command(this, loginService, accountsRepo, profileRepo, banProgressRepo, messages, audit);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
@@ -209,7 +214,7 @@ public final class LogDO2 extends JavaPlugin {
         var sm = getServer().getServicesManager();
         sm.register(ProfileReadPort.class, new ProfileReadAdapter(profileRepo), this, ServicePriority.Normal);
         sm.register(AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
-        sm.register(LogDO2Api.class, new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda, targetGuildId), this, ServicePriority.Normal);
+        sm.register(LogDO2Api.class, this.logdo2API, this, ServicePriority.Normal);
         // Expose LoginStatePort for admin commands or integrations that need temporary flags
         sm.register(LoginStatePort.class, loginStatePort, this, ServicePriority.Normal);
 

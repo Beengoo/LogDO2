@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin.adapters.api;
 
+import lombok.Setter;
 import net.dv8tion.jda.api.JDA;
 import ua.beengoo.logdo2.api.DiscordAccount;
 import ua.beengoo.logdo2.api.LogDO2Api;
@@ -18,7 +19,8 @@ public class LogDO2ApiImpl implements LogDO2Api {
     private final ProfileRepo profiles;
     private final AccountsRepo accounts;
     private final LoginStatePort loginState;
-    private final JDA discordBot;
+    @Setter
+    private JDA discordBot;
     private final String targetGuildId;
 
     public LogDO2ApiImpl(LoginService service,

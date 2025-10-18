@@ -21,6 +21,7 @@ public class ReloadListener implements Listener {
                 Config.getFileConfiguration().getStringList("discord.intents"),
                 Config.getFileConfiguration().getBoolean("discord.enableCacheChunking"),
                 Config.getFileConfiguration().getBoolean("discord.cacheAllGuildMembers"));
+        logDO2.getLogdo2API().setDiscordBot(logDO2.getJda());
     }
 
 }
