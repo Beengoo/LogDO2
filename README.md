@@ -81,4 +81,8 @@ Q: What SUNSHINE and MOONLIGHT builds means?
 A: These are builds where we add new functionality that is not yet tested to be included in stable releases. SUNSHINE and MOONLIGHT simply indicate when the version was released during the day or at night.
 
 ## License
-MIT License. See `LICENSE` for details.
+Copyright (C) 2025 Beengoo
+
+Licensed under the Mozilla Public License 2.0 (MPL-2.0)
+
+See [LICENSE](LICENSE) for details
