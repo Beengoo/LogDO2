@@ -5,7 +5,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import ua.beengoo.logdo2.api.provider.Properties;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;

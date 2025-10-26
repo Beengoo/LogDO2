@@ -5,8 +5,9 @@ api-version: "1.20"
 folia-supported: true
 commands:
   logdo2:
+    aliases: [l2]
     description: Main LogDO2 command
-    usage: "/logdo2 <help|link|logout|forgive|bypass|reload>"
+    usage: "/<command> <help|link|logout|forgive|bypass|reload>"
     permission: logdo2.admin
 permissions:
   logdo2.admin:
