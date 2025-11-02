@@ -8,18 +8,15 @@ body:
     id: summary
     attributes:
       label: Short summary
-      required: true
-  - type: textarea
+      - type: textarea
     id: motivation
     attributes:
       label: Why is this useful?
-      required: true
   - type: textarea
     id: design
     attributes:
       label: Proposed design
       description: Describe how it should work; include examples
-      required: false
   - type: dropdown
     id: priority
     attributes:
@@ -28,4 +25,3 @@ body:
         - Low
         - Medium
         - High
-      required: true
