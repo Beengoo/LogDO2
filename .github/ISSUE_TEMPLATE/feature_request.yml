@@ -7,8 +7,8 @@ body:
   - type: input
     id: summary
     attributes:
-      label: Short summary
-      - type: textarea
+    label: Short summary
+  - type: textarea
     id: motivation
     attributes:
       label: Why is this useful?
