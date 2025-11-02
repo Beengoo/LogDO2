@@ -14,36 +14,30 @@ body:
       label: Plugin version
       description: Which LogDO2 version are you using?
       placeholder: e.g. 1.3
-      required: true
   - type: input
     id: server_type
     attributes:
       label: Server core
       description: Paper/Folia
-      required: true
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
       description: Minimal reproducible steps
-      required: true
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
-      required: true
   - type: textarea
     id: actual
     attributes:
       label: Actual behavior (attach logs / stacktrace)
       description: Paste only relevant lines. Use a gist for long logs.
-      required: true
   - type: input
     id: related_config
     attributes:
       label: Relevant config keys
       description: e.g. oauth.clientId, web.publicUrl (do NOT include secrets)
-      required: false
   - type: dropdown
     id: impact
     attributes:
@@ -52,4 +46,3 @@ body:
         - Low
         - Medium
         - High
-      required: true
