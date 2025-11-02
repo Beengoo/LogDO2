@@ -3,15 +3,20 @@ package ua.beengoo.logdo2.core.service;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.events.LoginPhase;
 import ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent;
+import ua.beengoo.logdo2.api.events.PlayerLoginPhaseEnterEvent;
+import ua.beengoo.logdo2.api.events.PlayerLoginPhaseExitEvent;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.api.provider.Properties;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,7 +36,7 @@ public class LoginService {
     private final String redirectUri;
     private final Plugin plugin;
     private final MessagesPort msg;
-    private IpPolicyPort ipPolicy; // optional, provided by other plugins via Services
+    private IpPolicyPort ipPolicy;
 
     private final PropertiesProvider propertiesProvider;
 
@@ -70,16 +75,6 @@ public class LoginService {
         profiles.upsertName(uuid, name);
         profiles.updatePlatform(uuid, bedrock ? "BEDROCK" : "JAVA");
         Properties props = propertiesProvider.getSnapshot();
-
-        // TODO: Probably no need to handle it twice
-//        long now = System.currentTimeMillis() / 1000;
-//        var rec = banProgressRepo.findByIp(currentIp);
-//        if (rec.isPresent() && rec.get().lastBanUntilEpochSec() > now) {
-//            long remain = rec.get().lastBanUntilEpochSec() - now;
-//            Map<String, String> phb = Map.of("remaining", humanDuration(remain));
-//            kick(uuid, msg.mc("prelogin.banned", phb));
-//            return;
-//        }
 
         if (!accounts.isLinked(uuid)) {
             state.markPendingLogin(uuid, currentIp, bedrock);
@@ -279,7 +274,7 @@ public class LoginService {
         long now = System.currentTimeMillis() / 1000;
         var recOpt = banProgressRepo.findByIp(ip);
         int attempts = 0;
-        long lastAttempt = 0;
+        long lastAttempt;
 
         if (recOpt.isPresent()) {
             var rec = recOpt.get();
@@ -314,16 +309,22 @@ public class LoginService {
         runPlayer(uuid, p -> p.sendMessage(line));
     }
 
-    private void sendTitle(UUID uuid, String title, String subtitle, int in, int stay, int out) {
-        runPlayer(uuid, p -> p.sendTitle(title, subtitle, in, stay, out));
+    private void sendTitle(UUID uuid, String title, String subtitle) {
+        runPlayer(uuid, p -> p.showTitle(
+                Title.title(
+                        Component.text(title),
+                        Component.text(subtitle),
+                        Title.Times.times(Duration.ZERO, Duration.of(24, ChronoUnit.HOURS), Duration.ZERO)
+                )
+        ));
     }
 
     public void showLoginPhaseTitle(UUID uuid) {
-        sendTitle(uuid, msg.mc("login.first_join.title"), msg.mc("login.first_join.subtitle"), 0, 5000, 0);
+        sendTitle(uuid, msg.mc("login.first_join.title"), msg.mc("login.first_join.subtitle"));
     }
 
     public void showIpConfirmPhaseTitle(UUID uuid) {
-        sendTitle(uuid, msg.mc("ip.unconfirmed.title"), msg.mc("ip.unconfirmed.subtitle"), 0, 5000, 0);
+        sendTitle(uuid, msg.mc("ip.unconfirmed.title"), msg.mc("ip.unconfirmed.subtitle"));
     }
 
     public void clearPhaseTitle(UUID uuid) {
@@ -334,34 +335,30 @@ public class LoginService {
     }
 
     private void sendActionBar(UUID uuid, String msgLine) {
-        runPlayer(uuid, p -> p.sendActionBar(msgLine));
+        runPlayer(uuid, p -> p.sendActionBar(Component.text(msgLine)));
     }
 
     private void kick(UUID uuid, String reason) {
-        // Folia-safe: perform kick on player's region thread with a 1-tick delay
         try {
             Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null) {
                     try {
-                        p.getScheduler().execute(plugin, () -> p.kickPlayer(reason), null, 1L);
+                        p.getScheduler().execute(plugin, () -> p.kick(Component.text(reason)), null, 1L);
                     } catch (Throwable ignored) {
-                        // Non-Folia Paper path: kick immediately
-                        p.kickPlayer(reason);
+                        p.kick(Component.text(reason));
                     }
                 }
             });
         } catch (Throwable ignored) {
-            // Legacy Bukkit fallback: schedule 1 tick later
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
-                if (p != null) p.kickPlayer(reason);
+                if (p != null) p.kick(Component.text(reason));
             }, 1L);
         }
     }
 
-    // Check at login time whether the player should be disallowed (e.g., simultaneous play)
-    public Optional<String> disallowReasonOnLogin(UUID uuid, String name, String currentIp, boolean bedrock) {
+    public Optional<String> disallowReasonOnLogin(UUID uuid) {
         Properties props = propertiesProvider.getSnapshot();
         if (!props.disallowSimultaneousPlay) return Optional.empty();
         var owner = accounts.findDiscordForProfile(uuid);
@@ -376,25 +373,6 @@ public class LoginService {
             }
         }
         return Optional.empty();
-    }
-
-    private void runMain(Runnable r) {
-        if (Bukkit.isPrimaryThread()) {
-            r.run();
-            return;
-        }
-        // Prefer Folia/Paper schedulers if available
-        try {
-            // Paper API on both Paper and Folia
-            Bukkit.getGlobalRegionScheduler().execute(plugin, r);
-        } catch (Throwable ignored) {
-            // Fallback to legacy Bukkit scheduler (non-Folia)
-            try {
-                Bukkit.getScheduler().runTask(plugin, r);
-            } catch (Throwable t) {
-                throw new UnsupportedOperationException("No compatible scheduler available", t);
-            }
-        }
     }
 
     private void runPlayer(UUID uuid, java.util.function.Consumer<Player> action) {
@@ -417,7 +395,6 @@ public class LoginService {
                 }
             });
         } catch (Throwable ignored) {
-            // Non-Folia fallback
             Bukkit.getScheduler().runTask(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null) action.accept(p);
@@ -425,20 +402,20 @@ public class LoginService {
         }
     }
 
-    private void firePhaseEnter(UUID uuid, ua.beengoo.logdo2.api.events.LoginPhase phase) {
+    private void firePhaseEnter(UUID uuid, LoginPhase phase) {
         runPlayer(uuid, p -> {
             try {
                 org.bukkit.Bukkit.getPluginManager()
-                        .callEvent(new ua.beengoo.logdo2.api.events.PlayerLoginPhaseEnterEvent(p, phase));
+                        .callEvent(new PlayerLoginPhaseEnterEvent(p, phase));
             } catch (Throwable ignored) {}
         });
     }
 
-    private void firePhaseExit(UUID uuid, ua.beengoo.logdo2.api.events.LoginPhase phase) {
+    private void firePhaseExit(UUID uuid, LoginPhase phase) {
         runPlayer(uuid, p -> {
             try {
                 org.bukkit.Bukkit.getPluginManager()
-                        .callEvent(new ua.beengoo.logdo2.api.events.PlayerLoginPhaseExitEvent(p, phase));
+                        .callEvent(new PlayerLoginPhaseExitEvent(p, phase));
             } catch (Throwable ignored) {}
         });
     }

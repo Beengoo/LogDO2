@@ -8,7 +8,6 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Fired after login gating is evaluated for a player.
- * Notify-only: listeners must not change the result.
  */
 @Getter
 public class PlayerPostLoginCheckEvent extends Event {

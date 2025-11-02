@@ -19,7 +19,7 @@ public record DiscordAccount(
     }
 
     public Optional<MinecraftProfileSummary> primary() {
-        return profiles.isEmpty() ? Optional.empty() : Optional.of(profiles.get(0));
+        return profiles.isEmpty() ? Optional.empty() : Optional.of(profiles.getFirst());
     }
 
     public record MinecraftProfileSummary(java.util.UUID uuid, String name, MinecraftProfile.MinecraftPlatform platform, boolean primary) {}

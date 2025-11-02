@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin.command;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.*;
@@ -11,8 +12,6 @@ import ua.beengoo.logdo2.api.ports.AccountsRepo;
 import ua.beengoo.logdo2.api.ports.BanProgressRepo;
 import ua.beengoo.logdo2.api.ports.MessagesPort;
 import ua.beengoo.logdo2.api.ports.ProfileRepo;
-import ua.beengoo.logdo2.core.service.LoginService;
-import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
@@ -24,22 +23,17 @@ import java.util.stream.Collectors;
 public class LogDO2Command implements CommandExecutor, TabCompleter {
     private static final List<String> SUBS = List.of("help", "link", "logout", "forgive", "bypass", "reload");
 
-    private final LogDO2 plugin;
-    private final LoginService loginService;
     private final AccountsRepo accountsRepo;
     private final ProfileRepo profileRepo;
     private final BanProgressRepo banProgressRepo;
     private final MessagesPort msg;
     private final AuditLogger audit;
 
-    public LogDO2Command(LogDO2 plugin,LoginService loginService,
-                         AccountsRepo accountsRepo,
+    public LogDO2Command(AccountsRepo accountsRepo,
                          ProfileRepo profileRepo,
                          BanProgressRepo banProgressRepo,
                          MessagesPort msg,
                          AuditLogger audit) {
-        this.plugin = plugin;
-        this.loginService = loginService;
         this.accountsRepo = accountsRepo;
         this.profileRepo = profileRepo;
         this.banProgressRepo = banProgressRepo;
@@ -85,7 +79,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
     private void handleBypass(CommandSender sender, String[] args) {
         if (!sender.hasPermission("logdo2.admin.bypass")) { noPerm(sender); return; }
-        UUID targetUuid = null;
+        UUID targetUuid;
         if (args.length >= 2) {
             targetUuid = resolveUuid(args[1]);
             if (targetUuid == null) {
@@ -210,7 +204,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
     private static void kickIfOnline(UUID uuid, String reason) {
         Player p = Bukkit.getPlayer(uuid);
-        if (p != null && p.isOnline()) p.kickPlayer(reason);
+        if (p != null && p.isOnline()) p.kick(Component.text(reason));
     }
 
     private void handleForgive(CommandSender sender, String[] args) {
@@ -272,10 +266,13 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
     }
 
     private static boolean isValidIp(String ip) {
-        try { InetAddress.getByName(ip); return true; } catch (Exception e) { return false; }
+        try {
+            return InetAddress.getByName(ip) != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    // ==== tab complete ====
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender,
                                                 @NotNull Command command,

@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin.i18n;
 
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -12,6 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+@Slf4j
 public class YamlMessages implements MessagesPort {
     private final Plugin plugin;
     private final File file;
@@ -26,7 +28,9 @@ public class YamlMessages implements MessagesPort {
     }
 
     private void ensureFile() {
-        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+        if (!plugin.getDataFolder().exists()) {
+            if (!plugin.getDataFolder().mkdirs()) log.error("Unable to access data folder. (How tf that even possible?)");
+        }
         if (!file.exists()) {
             plugin.saveResource("messages.yml", false);
         }

@@ -1,9 +1,12 @@
 package ua.beengoo.logdo2.plugin.integration;
 
+import lombok.Getter;
+
 import java.lang.reflect.Method;
 import java.util.UUID;
 
 public final class FloodgateHook {
+    @Getter
     private final boolean present;
     private final Object api;
     private final Method isFloodgatePlayer;
@@ -21,15 +24,12 @@ public final class FloodgateHook {
             try { m2 = apiClass.getMethod("isFloodgateId", UUID.class); } catch (NoSuchMethodException ignore) {}
             ok = inst != null && (m1 != null || m2 != null);
         } catch (Throwable ignore) {
-            ok = false;
         }
         this.present = ok;
         this.api = inst;
         this.isFloodgatePlayer = m1;
         this.isFloodgateId = m2;
     }
-
-    public boolean isPresent() { return present; }
 
     public boolean isBedrock(UUID uuid) {
         if (!present) return false;

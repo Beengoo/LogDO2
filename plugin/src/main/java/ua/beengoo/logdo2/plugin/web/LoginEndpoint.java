@@ -49,9 +49,7 @@ public class LoginEndpoint {
     }
 
     public void start(int port) {
-        app = Javalin.create(javalinConfig -> {
-            javalinConfig.showJavalinBanner = false;
-        }).start(port);
+        app = Javalin.create(javalinConfig -> javalinConfig.showJavalinBanner = false).start(port);
         app.get("/login", this::handleLogin);
         app.get("/oauth/callback", this::handleCallback);
         logger.info("LoginEndpoint started on " + port);

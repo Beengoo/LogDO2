@@ -57,21 +57,25 @@ public final class LogDO2 extends JavaPlugin {
 
     @Getter
     private LoginService loginService;
-
-    // Ports/adapters
+    @Getter
     private OAuthPort oauthPort;
+    @Getter
     private DiscordDmPort discordDmPort;
+    @Getter
     private AccountsRepo accountsRepo;
+    @Getter
     private ProfileRepo profileRepo;
+    @Getter
     private TokensRepo tokensRepo;
     private YamlMessages messages;
-
+    @Getter
     private DiscordUserRepo discordUserRepo;
+    @Getter
     private BanProgressRepo banProgressRepo;
+    @Getter
     private LoginStatePort loginStatePort;
 
     private DatabaseManager db;
-    private FloodgateHook floodgate;
     @Getter
     private LogDO2ApiImpl logdo2API;
 
@@ -99,11 +103,9 @@ public final class LogDO2 extends JavaPlugin {
 
         int     bctal       = getConfig().getInt("platform.bedrockCodeTimeAfterLeave");
 
-        // DB → migrations
         this.db = new DatabaseManager(this);
         this.db.start();
 
-        // Crypto
         String keyB64 = getConfig().getString("security.tokenEncryptionKeyBase64", "");
         if (keyB64.isBlank()) {
             log.error("security.tokenEncryptionKeyBase64 is missing in config.yml");
@@ -112,7 +114,6 @@ public final class LogDO2 extends JavaPlugin {
         }
         EncryptionManager crypto = EncryptionManager.fromBase64(keyB64);
 
-        // Repos
         this.accountsRepo    = new JdbcAccountsRepo(db.dataSource(), db.dialect());
         this.profileRepo     = new JdbcProfileRepo(db.dataSource(), db.dialect());
         this.tokensRepo      = new JdbcTokensRepo(db.dataSource(), crypto, db.dialect());
@@ -120,7 +121,6 @@ public final class LogDO2 extends JavaPlugin {
         this.banProgressRepo = new JdbcBanProgressRepo(db.dataSource(), db.dialect());
         this.loginStatePort  = new LoginStateService(LogDO2PropertiesManager.getINSTANCE());
 
-        // OAuth (allow external override via ServicesManager)
         String redirectUri = publicUrl + "/oauth/callback";
         this.oauthPort = getServer().getServicesManager().load(OAuthPort.class);
         if (this.oauthPort == null) {
@@ -129,9 +129,8 @@ public final class LogDO2 extends JavaPlugin {
             log.info("Using external OAuthPort provider.");
         }
 
-        // Core
         this.loginService = new LoginService(
-                oauthPort, /* dmPort set after JDA */ null,
+                oauthPort, null,
                 accountsRepo, profileRepo, tokensRepo, loginStatePort, getLogger(),
                 publicUrl, redirectUri,
                 discordUserRepo,
@@ -143,18 +142,16 @@ public final class LogDO2 extends JavaPlugin {
 
         startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
 
-        // Discord DM adapter (prefer external provider if present)
         DiscordDmPort externalDm = getServer().getServicesManager().load(DiscordDmPort.class);
         if (externalDm != null) {
             this.discordDmPort = externalDm;
             this.loginService.setDiscordDmPort(discordDmPort);
             log.info("Using external DM provider.");
         } else {
-            this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, this);
+            this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages);
             this.loginService.setDiscordDmPort(discordDmPort);
         }
 
-        // Audit
         boolean auditEnabled = getConfig().getBoolean("audit.enabled", true);
         String auditFile = getConfig().getString("audit.file", "logdo2-actions.log");
         if (auditEnabled) {
@@ -167,7 +164,6 @@ public final class LogDO2 extends JavaPlugin {
             this.audit = null;
         }
 
-        // Web
         String postAction = getConfig().getString("postLogin.action", "text");
         String postText = getConfig().getString("postLogin.text", "Discord account linked. You can return to the game.");
         String redirectUrlCfg = getConfig().getString("postLogin.redirectUrl", "");
@@ -185,12 +181,11 @@ public final class LogDO2 extends JavaPlugin {
 
         this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda, targetGuildId);
 
-        LogDO2Command cmd = new LogDO2Command(this, loginService, accountsRepo, profileRepo, banProgressRepo, messages, audit);
+        LogDO2Command cmd = new LogDO2Command(accountsRepo, profileRepo, banProgressRepo, messages, audit);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 
-        // Bukkit listeners & timeouts
-        this.floodgate = new FloodgateHook();
+        FloodgateHook floodgate = new FloodgateHook();
         if (floodgate.isPresent()) log.info("Floodgate is supported!");
         Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages, audit), this);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this, audit), this);
@@ -203,19 +198,16 @@ public final class LogDO2 extends JavaPlugin {
         );
         this.timeouts.start();
 
-        // Optional policy provider
         IpPolicyPort ipPolicy = getServer().getServicesManager().load(IpPolicyPort.class);
         if (ipPolicy != null) {
             loginService.setIpPolicyPort(ipPolicy);
             log.info("External IP Policy in use.");
         }
 
-        // Register public services for integrations (read-only)
         var sm = getServer().getServicesManager();
         sm.register(ProfileReadPort.class, new ProfileReadAdapter(profileRepo), this, ServicePriority.Normal);
         sm.register(AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
         sm.register(LogDO2Api.class, this.logdo2API, this, ServicePriority.Normal);
-        // Expose LoginStatePort for admin commands or integrations that need temporary flags
         sm.register(LoginStatePort.class, loginStatePort, this, ServicePriority.Normal);
 
         log.info("Using SQL dialect: {}", db.dialect());
@@ -234,9 +226,8 @@ public final class LogDO2 extends JavaPlugin {
                         new ListenerAdapter() {
                             @Override public void onReady(@NotNull ReadyEvent event) {
                                 SlashCommandRegistrar.register(jda);
-                                // Install default DM adapter only if no external provider was set earlier
                                 if (discordDmPort == null) {
-                                    discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages, LogDO2.this);
+                                    discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages);
                                     loginService.setDiscordDmPort(discordDmPort);
                                 } else {
                                     log.info("External DM adapter used.");
@@ -261,7 +252,7 @@ public final class LogDO2 extends JavaPlugin {
     public void restartJDA(String botToken, List<String> intentNames,
                             boolean enableCacheChunking, boolean cacheAllGuildMembers){
         shutdownJDA();
-        if (jda == null) {
+        if (jda != null) {
             jda = null;
         }
         startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);

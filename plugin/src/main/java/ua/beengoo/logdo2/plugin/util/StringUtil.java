@@ -1,9 +1,7 @@
 package ua.beengoo.logdo2.plugin.util;
 
 public class StringUtil {
-    private StringUtil() {
-        // Utility
-    }
+    private StringUtil() {}
 
     public static String stripTrailingSlash(String s) {
         if (s == null) return null;

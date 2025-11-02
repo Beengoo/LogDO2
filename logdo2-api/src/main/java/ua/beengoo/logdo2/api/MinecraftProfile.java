@@ -11,7 +11,6 @@ public record MinecraftProfile(
         Optional<Long> linkedDiscord
 ) {
     public boolean isLinked() { return linkedDiscord != null && linkedDiscord.isPresent(); }
-    public Optional<Long> linkedDiscordId() { return linkedDiscord; }
 
     public enum MinecraftPlatform { JAVA, BEDROCK, UNKNOWN;
         public static MinecraftPlatform fromDatabase(String v) {

@@ -5,7 +5,7 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Fired when plugin reloaded
+ * Fired when plugin is reloaded
  */
 public class LogDO2ReloadEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();

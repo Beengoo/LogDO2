@@ -7,10 +7,9 @@ import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.api.ports.MessagesPort;
 import ua.beengoo.logdo2.api.ports.ProfileRepo;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.awt.*;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -19,9 +18,9 @@ public class JdaDiscordButtonListener extends ListenerAdapter {
     private final ProfileRepo profileRepo;
     private final MessagesPort msg;
     private final Logger log;
-    private final ua.beengoo.logdo2.plugin.util.AuditLogger audit;
+    private final AuditLogger audit;
 
-    public JdaDiscordButtonListener(LoginService loginService, ProfileRepo profileRepo, MessagesPort msg, Logger log, ua.beengoo.logdo2.plugin.util.AuditLogger audit) {
+    public JdaDiscordButtonListener(LoginService loginService, ProfileRepo profileRepo, MessagesPort msg, Logger log, AuditLogger audit) {
         this.loginService = loginService;
         this.profileRepo = profileRepo;
         this.msg = msg;
@@ -32,7 +31,7 @@ public class JdaDiscordButtonListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(@NotNull ButtonInteractionEvent event) {
         String cid = event.getComponentId(); // "ip:accept:<uuid>" | "ip:reject:<uuid>"
-        if (cid == null || !cid.startsWith("ip:")) return;
+        if (!cid.startsWith("ip:")) return;
 
         String[] parts = cid.split(":");
         if (parts.length != 3) return;
@@ -74,11 +73,7 @@ public class JdaDiscordButtonListener extends ListenerAdapter {
 
     private void updateEmbed(ButtonInteractionEvent event, String name, UUID uuid, boolean confirmed) {
         var embeds = event.getMessage().getEmbeds();
-        EmbedBuilder eb = embeds.isEmpty() ? new EmbedBuilder() : new EmbedBuilder(embeds.get(0));
-
-        Map<String, String> ph = new HashMap<>();
-        ph.put("name", name);
-        ph.put("uuid", uuid.toString());
+        EmbedBuilder eb = embeds.isEmpty() ? new EmbedBuilder() : new EmbedBuilder(embeds.getFirst());
 
         if (confirmed) {
             eb.setTitle(msg.raw("discord.ip_confirm_title_confirmed")
@@ -90,15 +85,14 @@ public class JdaDiscordButtonListener extends ListenerAdapter {
             eb.setColor(Color.RED);
         }
 
-        // Редагуємо існуюче повідомлення: новий заголовок, прибираємо кнопки
         event.editMessageEmbeds(eb.build())
-                .setComponents() // порожньо = без кнопок
+                .setComponents()
                 .queue();
     }
 
     private void safeDisableButtons(ButtonInteractionEvent event) {
         var embeds = event.getMessage().getEmbeds();
-        EmbedBuilder eb = embeds.isEmpty() ? new EmbedBuilder() : new EmbedBuilder(embeds.get(0));
+        EmbedBuilder eb = embeds.isEmpty() ? new EmbedBuilder() : new EmbedBuilder(embeds.getFirst());
         event.editMessageEmbeds(eb.build()).setComponents().queue();
     }
 }

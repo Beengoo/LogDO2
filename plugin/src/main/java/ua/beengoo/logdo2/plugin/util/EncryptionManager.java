@@ -7,15 +7,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 import java.util.Base64;
 
-public final class EncryptionManager {
+public record EncryptionManager(SecretKey key) {
     private static final String ALG = "AES/GCM/NoPadding";
     private static final int GCM_TAG_BITS = 128;
     private static final int IV_LEN = 12;
     private static final SecureRandom RND = new SecureRandom();
-
-    private final SecretKey key;
-
-    private EncryptionManager(SecretKey key) { this.key = key; }
 
     public static EncryptionManager fromBase64(String base64) {
         byte[] raw = Base64.getDecoder().decode(base64);

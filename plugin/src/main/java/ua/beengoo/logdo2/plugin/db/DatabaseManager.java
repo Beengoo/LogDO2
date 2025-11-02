@@ -5,15 +5,9 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.plugin.Plugin;
 
 import javax.sql.DataSource;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.time.Instant;
 import java.util.Locale;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 public class DatabaseManager {
     public enum Dialect { SQLITE, MYSQL, POSTGRES }
@@ -33,10 +27,9 @@ public class DatabaseManager {
 
         HikariConfig cfg = new HikariConfig();
         cfg.setJdbcUrl(url);
-        if (user != null && !user.isBlank()) cfg.setUsername(user);
-        if (pass != null && !pass.isBlank()) cfg.setPassword(pass);
+        if (!user.isBlank()) cfg.setUsername(user);
+        if (!pass.isBlank()) cfg.setPassword(pass);
         cfg.setMaximumPoolSize(maxPool);
-        // легкий keepalive
         cfg.setKeepaliveTime(30_000);
         cfg.setConnectionTimeout(15_000);
 
@@ -83,7 +76,7 @@ public class DatabaseManager {
             String sql = new java.io.BufferedReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))
                     .lines().collect(java.util.stream.Collectors.joining("\n"));
             try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
-                // просте розбиття по ';' на кінці рядка
+
                 for (String stmt : sql.split(";\\s*\\n")) {
                     String s = stmt.trim();
                     if (s.isEmpty()) continue;
@@ -94,7 +87,4 @@ public class DatabaseManager {
             throw new RuntimeException("Migration failed (" + path + "): " + ex.getMessage(), ex);
         }
     }
-
-
-    public static long nowEpoch() { return Instant.now().getEpochSecond(); }
 }

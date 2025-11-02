@@ -6,6 +6,9 @@ import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Fires when any Login phase was begin
+ * */
 @Getter
 public class PlayerLoginPhaseEnterEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();

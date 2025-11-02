@@ -10,9 +10,7 @@ import java.util.Set;
 
 @Slf4j
 public class EnumsUtil {
-    private EnumsUtil() {
-        // utility class
-    }
+    private EnumsUtil() {}
 
     public static <E extends Enum<E>> Set<E> parseEnums(
             Class<E> enumClass,

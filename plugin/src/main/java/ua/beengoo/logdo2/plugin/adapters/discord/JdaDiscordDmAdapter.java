@@ -4,7 +4,6 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.ports.DiscordDmPort;
 import ua.beengoo.logdo2.api.ports.MessagesPort;
 
@@ -17,13 +16,11 @@ public class JdaDiscordDmAdapter implements DiscordDmPort {
     private final JDA jda;
     private final Logger log;
     private final MessagesPort msg;
-    private final Plugin plugin;
 
-    public JdaDiscordDmAdapter(JDA jda, Logger log, MessagesPort msg, Plugin plugin) {
+    public JdaDiscordDmAdapter(JDA jda, Logger log, MessagesPort msg) {
         this.jda = jda;
         this.log = log;
         this.msg = msg;
-        this.plugin = plugin;
     }
 
     @Override
@@ -40,7 +37,7 @@ public class JdaDiscordDmAdapter implements DiscordDmPort {
                     .setColor(Color.GREEN)
                     .setTimestamp(Instant.now());
 
-            openDmAndSendEmbed(user, eb, "firstLogin");
+            openDmAndSendEmbed(user, eb);
         }, ex -> log.warning("[LogDO2] retrieveUserById failed (firstLogin): " + ex.getMessage()));
     }
 
@@ -90,13 +87,13 @@ public class JdaDiscordDmAdapter implements DiscordDmPort {
         }, ex -> log.warning("[LogDO2] retrieveUserById failed (finalizeOAuth): " + ex.getMessage()));
     }
 
-    private void openDmAndSendEmbed(User user, EmbedBuilder eb, String tag) {
+    private void openDmAndSendEmbed(User user, EmbedBuilder eb) {
         user.openPrivateChannel().queue(
                 ch -> ch.sendMessageEmbeds(eb.build()).queue(
                         s  -> {},
-                        ex -> log.warning("[LogDO2] DM send failed (" + tag + "): " + ex.getMessage())
+                        ex -> log.warning("[LogDO2] DM send failed (" + "firstLogin" + "): " + ex.getMessage())
                 ),
-                ex -> log.warning("[LogDO2] Open DM failed (" + tag + "): " + ex.getMessage())
+                ex -> log.warning("[LogDO2] Open DM failed (" + "firstLogin" + "): " + ex.getMessage())
         );
     }
 }

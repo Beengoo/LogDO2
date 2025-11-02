@@ -16,7 +16,8 @@ public class Config {
         plugin = p;
         updateConfigDefaults();
         fileConfiguration = p.getConfig();
-        LogDO2PropertiesManager.getINSTANCE().initFrom(plugin);
+        if (!LogDO2PropertiesManager.getINSTANCE().initFrom(plugin))
+            throw new RuntimeException("Unable to initialize plugin configuration");
     }
 
     public static void reload() {
@@ -39,7 +40,6 @@ public class Config {
 
             boolean changed = false;
             for (String key : defaults.getKeys(true)) {
-                // Only add keys that are truly missing from file (ignore defaults)
                 if (!cfg.isSet(key)) {
                     cfg.set(key, defaults.get(key));
                     changed = true;

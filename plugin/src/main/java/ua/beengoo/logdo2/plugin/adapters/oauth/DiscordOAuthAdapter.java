@@ -22,7 +22,7 @@ public class DiscordOAuthAdapter implements OAuthPort {
     private final ObjectMapper om = new ObjectMapper();
     private final String clientId;
     private final String clientSecret;
-    private final String scopesCfg; // for example: "identify email applications.commands"
+    private final String scopesCfg; //"identify email applications.commands"
 
     public DiscordOAuthAdapter(Logger log, String clientId, String clientSecret, String scopes) {
         this.log = log;
@@ -46,7 +46,6 @@ public class DiscordOAuthAdapter implements OAuthPort {
 
     @Override
     public TokenSet exchangeCode(String code, String redirectUri) {
-        // Token endpoint ЗАЛИШАЄТЬСЯ з /api
         String body = "client_id=" + enc(clientId)
                 + "&client_secret=" + enc(clientSecret)
                 + "&grant_type=authorization_code"
@@ -60,6 +59,7 @@ public class DiscordOAuthAdapter implements OAuthPort {
 
         try (Response res = http.newCall(req).execute()) {
             if (!res.isSuccessful()) throw new IOException("token exchange failed: " + res.code());
+            assert res.body() != null;
             JsonNode json = om.readTree(res.body().byteStream());
             String access   = json.get("access_token").asText();
             String refresh  = json.get("refresh_token").asText();
@@ -83,6 +83,7 @@ public class DiscordOAuthAdapter implements OAuthPort {
 
         try (Response res = http.newCall(req).execute()) {
             if (!res.isSuccessful()) throw new IOException("fetch user failed: " + res.code());
+            assert res.body() != null;
             JsonNode j = om.readTree(res.body().byteStream());
             long id = j.get("id").asLong();
             String username = j.hasNonNull("username") ? j.get("username").asText() : null;

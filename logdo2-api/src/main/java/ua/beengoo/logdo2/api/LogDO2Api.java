@@ -2,6 +2,7 @@ package ua.beengoo.logdo2.api;
 
 import net.dv8tion.jda.api.JDA;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -19,6 +20,7 @@ public interface LogDO2Api {
     MinecraftProfile getMinecraftProfile(UUID uuid);
     SessionView getSessionForProfile(UUID uuid);
     JDA getDiscordBot();
+    List<MinecraftProfile> getUsersByDiscord(long discordId);
     String getTargetGuildId();
 }
 

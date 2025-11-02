@@ -22,7 +22,7 @@ public class TimeoutManager {
     private final Duration bedrockReuseWindow;
 
     // Scheduling state
-    private boolean folia; // true if Folia APIs are available
+    private final boolean folia; // true if Folia APIs are available
     private int legacyTaskId = -1; // Spigot/Paper task id
     private Object foliaTask = null; // io.papermc.paper.threadedregions.scheduler.ScheduledTask, but kept as Object to avoid hard dep
 

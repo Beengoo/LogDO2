@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin.listeners;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -27,7 +28,7 @@ public class PreLoginListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAsyncPreLogin(AsyncPlayerPreLoginEvent event) {
-        String ip = event.getAddress() != null ? event.getAddress().getHostAddress() : null;
+        String ip = event.getAddress().getHostAddress();
         if (ip == null || ip.isBlank()) return;
 
         long now = System.currentTimeMillis() / 1000;
@@ -42,7 +43,7 @@ public class PreLoginListener implements Listener {
         ph.put("remaining", humanDuration(remain));
         String kickMsg = msg.mc("prelogin.banned", ph);
 
-        event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, kickMsg);
+        event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, Component.text(kickMsg));
         log.info("[LogDO2] Blocked banned IP " + ip + " (" + event.getUniqueId() + "): " + kickMsg);
         if (audit != null) audit.log("minecraft", "prelogin_blocked_banned", java.util.Map.of(
                 "ip", ip,

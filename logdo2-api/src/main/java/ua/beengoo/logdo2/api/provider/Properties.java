@@ -1,7 +1,5 @@
 package ua.beengoo.logdo2.api.provider;
 
-import java.time.Duration;
-
 public final class Properties {
     public final long bedrockCodeTimeAfterLeave;
     public final int bedrockLimitPerDiscord;

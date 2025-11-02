@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.plugin.util;
 
+import lombok.Getter;
 import org.bukkit.plugin.Plugin;
 
 import java.io.*;
@@ -11,6 +12,7 @@ import java.util.Map;
 
 /** Simple audit logger that writes to a dedicated file in the server root. */
 public class AuditLogger implements Closeable {
+    @Getter
     private final File file;
     private final Writer writer;
     private final Object lock = new Object();

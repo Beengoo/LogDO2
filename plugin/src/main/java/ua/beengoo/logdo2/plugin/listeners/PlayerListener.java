@@ -1,5 +1,7 @@
 package ua.beengoo.logdo2.plugin.listeners;
 
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
@@ -14,6 +16,7 @@ import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
+import java.net.InetAddress;
 import java.util.Optional;
 
 
@@ -37,7 +40,7 @@ public class PlayerListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onLogin(PlayerLoginEvent e) {
         Player p = e.getPlayer();
-        String ip = Optional.ofNullable(e.getAddress()).map(a -> a.getHostAddress()).orElse("unknown");
+        String ip = Optional.of(e.getAddress()).map(InetAddress::getHostAddress).orElse("unknown");
         boolean bedrock = isBedrock(p);
         if (audit != null) audit.log("minecraft", "player_login_attempt", java.util.Map.of(
                 "name", p.getName(),
@@ -45,14 +48,14 @@ public class PlayerListener implements Listener {
                 "ip", ip,
                 "bedrock", String.valueOf(bedrock)
         ));
-        var reasonOpt = loginService.disallowReasonOnLogin(p.getUniqueId(), p.getName(), ip, bedrock);
+        var reasonOpt = loginService.disallowReasonOnLogin(p.getUniqueId());
         boolean allowed = reasonOpt.isEmpty();
         try {
             org.bukkit.Bukkit.getPluginManager().callEvent(
                     new ua.beengoo.logdo2.api.events.PlayerPostLoginCheckEvent(p, ip, bedrock, allowed, reasonOpt.orElse(null))
             );
         } catch (Throwable ignored) {}
-        reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, reason));
+        reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, Component.text(reason)));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -110,7 +113,7 @@ public class PlayerListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
-    public void onChat(AsyncPlayerChatEvent e) {
+    public void onChat(AsyncChatEvent e) {
         if (!isAllowed(e.getPlayer(), Action.CHAT)) e.setCancelled(true);
     }
 
@@ -142,17 +145,23 @@ public class PlayerListener implements Listener {
         else refreshVisuals(p);
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean isAllowed(Player p, Action action) {
         // If fully allowed by service (i.e., not pending states), no gating applies
         String ip = getIp(p);
         boolean coreAllowed = loginService.isActionAllowed(p.getUniqueId(), ip);
-        // Notify listeners about the check (notify-only; decision stays as coreAllowed)
-        try {
-            Bukkit.getPluginManager().callEvent(
-                    new PlayerIpCheckEvent(p, ip, coreAllowed)
-            );
-        } catch (Throwable ignored) {}
-        if (coreAllowed) return true;
+
+        PlayerIpCheckEvent event = new PlayerIpCheckEvent(p, ip, coreAllowed);
+        Bukkit.getPluginManager().callEvent(event);
+
+        boolean finalAllowed;
+        if (event.isAllowed() != coreAllowed) {
+            finalAllowed = event.isAllowed();
+        } else {
+            finalAllowed = coreAllowed;
+        }
+
+        if (finalAllowed) return true;
 
         // Determine phase
         Phase phase = getPhase(p);

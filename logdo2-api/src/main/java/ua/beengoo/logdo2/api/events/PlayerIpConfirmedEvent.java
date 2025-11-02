@@ -6,6 +6,9 @@ import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Fires when player pass Ip confirm stage
+ * */
 @Getter
 public class PlayerIpConfirmedEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
