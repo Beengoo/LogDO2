@@ -7,6 +7,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Instant;
+import java.util.Optional;
 
 public class JdbcDiscordUserRepo implements DiscordUserRepo {
     private final DataSource ds;
@@ -14,6 +15,26 @@ public class JdbcDiscordUserRepo implements DiscordUserRepo {
 
     public JdbcDiscordUserRepo(DataSource ds, DatabaseManager.Dialect dialect) {
         this.ds = ds; this.dialect = dialect;
+    }
+
+    @Override
+    public Optional<String> findEmailByDiscordId(long discordId) {
+        String sql = "SELECT email FROM discord_accounts WHERE discord_id=? LIMIT 1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String email = rs.getString("email");
+                    if (email != null && !email.isBlank()) {
+                        return Optional.of(email);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return Optional.empty();
     }
 
     @Override

@@ -1,39 +1,40 @@
-# Use & for Minecraft color codes. Placeholders: {name}, {ip}, {code}, {url}, {duration}, {remaining}
+# Placeholders: {name}, {uuid}, {ip}, {code}, {url}, {duration}, {remaining}
+
 prelogin:
-  banned: "&cYou are banned. Remaining: {remaining}"
+  banned: "<red>You are banned. Remaining: {remaining}</red>"
 
 login:
   first_join:
-    title: "&eAuthorize via Discord"
-    subtitle: "&7Click the chat link to link your account"
-    click_text: "[Click here to authorize]"
+    title: "<#ffcc00>Authorize via Discord</#ffcc00>"
+    subtitle: "<gray>Click the chat link to link your account</gray>"
+    click_text: "<yellow>[Click here to authorize]</yellow>"
     click_hover: "Open Discord OAuth2"
   bedrock:
-    code_hint: "&eOpen Discord and run &b/login {code} &ewith the bot."
+    code_hint: "<yellow>Open Discord and run </yellow><aqua>/login {code}</aqua><yellow> with the bot.</yellow>"
   linked:
-    actionbar: "&aLogin valid"
+    actionbar: "<green>Login valid</green>"
 
 ip:
   unconfirmed:
-    title: "&cIP not confirmed"
-    subtitle: "&7Check your Discord DM"
-  confirm_actionbar: "&aIP confirmed. You can play now."
-  reject_actionbar: "&cLogin rejected. IP banned for {duration}."
-  reject_kick: "Login rejected by account owner. Ban {duration}."
+    title: "<red>IP not confirmed</red>"
+    subtitle: "<gray>Check your Discord DM</gray>"
+  confirm_actionbar: "<green>IP confirmed. You can play now.</green>"
+  reject_actionbar: "<red>Login rejected. IP banned for {duration}.</red>"
+  reject_kick: "<red>Login rejected by account owner. Ban {duration}.</red>"
 
 oauth:
-  linked_actionbar: "&aDiscord linked. Welcome, {name}!"
+  linked_actionbar: "<green>Discord linked. Welcome, {name}!</green>"
 
 timeouts:
-  login_kick: "Login timed out. Please rejoin to try again."
-  ip_kick: "IP confirmation timed out. Please rejoin to request again."
+  login_kick: "<red>Login timed out. Please rejoin to try again.</red>"
+  ip_kick: "<red>IP confirmation timed out. Please rejoin to request again.</red>"
 
 chat:
-  auth_link_text: "&a[Click here to authorize]"
+  auth_link_text: "<green>[Click here to authorize]</green>"
   auth_link_hover: "Open Discord OAuth2"
 
 discord:
-  first_login_dm: "Your Minecraft account {name} ({uuid}) has been linked. Welcome!"
+  first_login_dm: "<green>Your Minecraft account {name} ({uuid}) has been linked. Welcome!</green>"
   ip_confirm_title: "New login detected"
   ip_confirm_title_confirmed: "✅ Login confirmed for {name} ({uuid})"
   ip_confirm_title_rejected: "❌ Login rejected for {name} ({uuid})"
@@ -46,7 +47,7 @@ discord:
   slash_login_missing_code: "Missing required option: code"
 
 admin:
-  logout_kick: "&cYou have been logged out by an admin. Please rejoin to link again."
+  logout_kick: "<red>You have been logged out by an admin. Please rejoin to link again.</red>"
 
 limits:
-  simultaneous_kick: "&cAnother profile linked to your Discord is already online: {other}"
+  simultaneous_kick: "<red>Another profile linked to your Discord is already online: {other}</red>"

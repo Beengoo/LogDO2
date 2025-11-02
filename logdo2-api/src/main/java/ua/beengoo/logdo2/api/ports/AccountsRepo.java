@@ -13,7 +13,7 @@ public interface AccountsRepo {
 
     /** Activate the reserved link for this pair (sets active=1 and deactivates others for the profile). */
     void activate(long discordId, UUID profileUuid);
-
+    Optional<Long> linkedAt(UUID profileUUID);
     boolean isLinked(UUID profileUuid);
     Optional<Long> findDiscordForProfile(UUID profileUuid);
     /** Returns any discord id reserved/linked for this profile, regardless of active flag. */

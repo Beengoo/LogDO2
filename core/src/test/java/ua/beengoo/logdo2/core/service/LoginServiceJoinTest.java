@@ -5,7 +5,6 @@ import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.api.provider.Properties;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,17 +19,12 @@ class LoginServiceJoinTest {
         @Override public String mc(String path, Map<String, String> placeholders) { return path; }
     };
 
-    private static final PropertiesProvider props = new PropertiesProvider() {
-        @Override
-        public ua.beengoo.logdo2.api.provider.Properties getSnapshot() {
-            return new Properties(
-                    60,
-                    1, 1,
-                    true, true, 0, 2, 4, 100,
-                    true
-            );
-        }
-    };
+    private static final PropertiesProvider props = () -> new Properties(
+            60,
+            1, 1,
+            true, true, 0, 2, 4, 100,
+            true
+    );
 
     @Test
     void bedrockJoinCreatesPendingLoginAndPlatform() {
@@ -199,6 +193,12 @@ class LoginServiceJoinTest {
             lastActivatedProfile = profileUuid;
             lastActivatedDiscord = discordId;
         }
+
+        @Override
+        public Optional<Long> linkedAt(UUID profileUUID) {
+            return Optional.empty();
+        }
+
         @Override public boolean isLinked(UUID profileUuid) { return linked.contains(profileUuid); }
         @Override public Optional<Long> findDiscordForProfile(UUID profileUuid) { return Optional.ofNullable(active.get(profileUuid)); }
         @Override public Optional<Long> findAnyDiscordForProfile(UUID profileUuid) { return Optional.ofNullable(any.getOrDefault(profileUuid, active.get(profileUuid))); }
@@ -230,6 +230,12 @@ class LoginServiceJoinTest {
         final Set<Long> upserted = new HashSet<>();
         final Map<Long, Boolean> commandsInstalled = new HashMap<>();
         @Override public void upsertUser(long discordId, String username, String globalName, String email, String avatarHash) { upserted.add(discordId); }
+
+        @Override
+        public Optional<String> findEmailByDiscordId(long discordId) {
+            return Optional.empty();
+        }
+
         @Override public void setCommandsInstalled(long discordId, boolean installed) { commandsInstalled.put(discordId, installed); }
     }
 

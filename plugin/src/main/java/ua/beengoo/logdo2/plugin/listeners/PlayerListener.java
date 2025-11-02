@@ -1,7 +1,7 @@
 package ua.beengoo.logdo2.plugin.listeners;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
-import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
@@ -10,6 +10,7 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.events.PlayerIpCheckEvent;
+import ua.beengoo.logdo2.api.events.PlayerPostLoginCheckEvent;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.plugin.config.Config;
@@ -25,6 +26,7 @@ public class PlayerListener implements Listener {
     private final FloodgateHook floodgate;
     private final LoginStatePort state;
     private final Plugin plugin;
+    private static final MiniMessage MINI = MiniMessage.miniMessage();
     private final AuditLogger audit;
     private final java.util.Map<java.util.UUID, Phase> lastPhase = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -52,10 +54,10 @@ public class PlayerListener implements Listener {
         boolean allowed = reasonOpt.isEmpty();
         try {
             org.bukkit.Bukkit.getPluginManager().callEvent(
-                    new ua.beengoo.logdo2.api.events.PlayerPostLoginCheckEvent(p, ip, bedrock, allowed, reasonOpt.orElse(null))
+                    new PlayerPostLoginCheckEvent(p, ip, bedrock, allowed, reasonOpt.orElse(null))
             );
         } catch (Throwable ignored) {}
-        reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, Component.text(reason)));
+        reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, MINI.deserialize(reason)));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

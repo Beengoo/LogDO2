@@ -144,6 +144,25 @@ public class JdbcAccountsRepo implements AccountsRepo {
         }
     }
 
+    @Override
+    public Optional<Long> linkedAt(UUID profileUUID) {
+        String sql = "SELECT created_at FROM links WHERE mc_uuid = ? AND active = 1 LIMIT 1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, profileUUID.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                long v = rs.getLong("created_at");
+                if (rs.wasNull()) return Optional.empty();
+
+                return Optional.of(v);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
     private PreparedStatement upsertProfileSql(Connection c) throws Exception {
         return switch (dialect) {
             case POSTGRES, SQLITE -> c.prepareStatement(

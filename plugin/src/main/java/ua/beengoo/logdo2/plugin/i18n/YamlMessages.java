@@ -62,7 +62,7 @@ public class YamlMessages implements MessagesPort {
 
     @Override
     public String mc(String path) {
-        return colorize(raw(path));
+        return raw(path);
     }
 
     @Override
@@ -73,10 +73,6 @@ public class YamlMessages implements MessagesPort {
                 s = s.replace("{" + e.getKey() + "}", String.valueOf(e.getValue()));
             }
         }
-        return colorize(s);
-    }
-
-    private static String colorize(String s) {
-        return s == null ? "" : s.replace('&', '§');
+        return s;
     }
 }

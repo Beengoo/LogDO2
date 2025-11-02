@@ -181,7 +181,7 @@ public final class LogDO2 extends JavaPlugin {
 
         this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda, targetGuildId);
 
-        LogDO2Command cmd = new LogDO2Command(accountsRepo, profileRepo, banProgressRepo, messages, audit);
+        LogDO2Command cmd = new LogDO2Command(accountsRepo, profileRepo, banProgressRepo, discordUserRepo, messages, audit, jda);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 

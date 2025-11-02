@@ -5,7 +5,6 @@ import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.api.provider.Properties;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -13,17 +12,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LoginServiceLimitBypassTest {
 
-    private static final PropertiesProvider props = new PropertiesProvider() {
-        @Override
-        public ua.beengoo.logdo2.api.provider.Properties getSnapshot() {
-            return new Properties(
-                    60,
-                    1, 1,
-                    true, true, 0, 2, 4, 100,
-                    true
-            );
-        }
-    };
+    private static final PropertiesProvider props = () -> new Properties(
+            60,
+            1, 1,
+            true, true, 0, 2, 4, 100,
+            true
+    );
 
     private static final MessagesPort MSG = new MessagesPort() {
         @Override public String raw(String path) { return path; }
@@ -54,6 +48,12 @@ class LoginServiceLimitBypassTest {
             links.removeIf(l -> l.uuid.equals(profileUuid));
             links.add(new Link(discordId, profileUuid, true));
         }
+
+        @Override
+        public Optional<Long> linkedAt(UUID profileUUID) {
+            return Optional.empty();
+        }
+
         @Override public boolean isLinked(UUID profileUuid) { return links.stream().anyMatch(l -> l.uuid.equals(profileUuid) && l.active); }
         @Override public Optional<Long> findDiscordForProfile(UUID profileUuid) {
             return links.stream().filter(l -> l.uuid.equals(profileUuid) && l.active).map(l -> l.discordId).findFirst();

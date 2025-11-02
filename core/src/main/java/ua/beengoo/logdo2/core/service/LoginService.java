@@ -3,6 +3,7 @@ package ua.beengoo.logdo2.core.service;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 public class LoginService {
@@ -37,6 +39,8 @@ public class LoginService {
     private final Plugin plugin;
     private final MessagesPort msg;
     private IpPolicyPort ipPolicy;
+
+    private static final MiniMessage MINI = MiniMessage.miniMessage();
 
     private final PropertiesProvider propertiesProvider;
 
@@ -221,7 +225,7 @@ public class LoginService {
         if (pending == null) return;
 
         long durSec = applyProgressiveBan(pending.newIp());
-        Map<String, String> ph = Map.of("duration", humanDuration(durSec));
+        Map<String, String> ph = Map.of("duration", formattedDuration(durSec));
         sendActionBar(profileUuid, msg.mc("ip.reject_actionbar", ph));
         kick(profileUuid, msg.mc("ip.reject_kick", ph));
         firePhaseExit(profileUuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
@@ -298,8 +302,8 @@ public class LoginService {
     // === Components & main-thread helpers ===
     private void sendClickableAuth(UUID uuid, String text, String hover, String loginUrl) {
         runPlayer(uuid, p -> {
-            Component comp = Component.text(text)
-                    .hoverEvent(HoverEvent.showText(Component.text(hover)))
+            Component comp = MINI.deserialize(text)
+                    .hoverEvent(HoverEvent.showText(MINI.deserialize(hover)))
                     .clickEvent(ClickEvent.openUrl(loginUrl));
             p.sendMessage(comp);
         });
@@ -312,8 +316,8 @@ public class LoginService {
     private void sendTitle(UUID uuid, String title, String subtitle) {
         runPlayer(uuid, p -> p.showTitle(
                 Title.title(
-                        Component.text(title),
-                        Component.text(subtitle),
+                        MINI.deserialize(title),
+                        MINI.deserialize(subtitle),
                         Title.Times.times(Duration.ZERO, Duration.of(24, ChronoUnit.HOURS), Duration.ZERO)
                 )
         ));
@@ -335,7 +339,7 @@ public class LoginService {
     }
 
     private void sendActionBar(UUID uuid, String msgLine) {
-        runPlayer(uuid, p -> p.sendActionBar(Component.text(msgLine)));
+        runPlayer(uuid, p -> p.sendActionBar(MINI.deserialize(msgLine)));
     }
 
     private void kick(UUID uuid, String reason) {
@@ -344,16 +348,16 @@ public class LoginService {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null) {
                     try {
-                        p.getScheduler().execute(plugin, () -> p.kick(Component.text(reason)), null, 1L);
+                        p.getScheduler().execute(plugin, () -> p.kick(MINI.deserialize(reason)), null, 1L);
                     } catch (Throwable ignored) {
-                        p.kick(Component.text(reason));
+                        p.kick(MINI.deserialize(reason));
                     }
                 }
             });
         } catch (Throwable ignored) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
-                if (p != null) p.kick(Component.text(reason));
+                if (p != null) p.kick(MINI.deserialize(reason));
             }, 1L);
         }
     }
@@ -368,14 +372,14 @@ public class LoginService {
             if (other.getUniqueId().equals(uuid)) continue;
             var otherOwner = accounts.findDiscordForProfile(other.getUniqueId());
             if (otherOwner.isPresent() && otherOwner.get() == discordId) {
-                java.util.Map<String, String> ph = java.util.Map.of("other", other.getName());
+                Map<String, String> ph = Map.of("other", other.getName());
                 return Optional.of(msg.mc("limits.simultaneous_kick", ph));
             }
         }
         return Optional.empty();
     }
 
-    private void runPlayer(UUID uuid, java.util.function.Consumer<Player> action) {
+    private void runPlayer(UUID uuid, Consumer<Player> action) {
         if (Bukkit.isPrimaryThread()) {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) action.accept(p);
@@ -420,7 +424,7 @@ public class LoginService {
         });
     }
 
-    private static String humanDuration(long seconds) {
+    private static String formattedDuration(long seconds) {
         long s = seconds;
         long d = s / 86400; s %= 86400;
         long h = s / 3600;  s %= 3600;

@@ -5,16 +5,19 @@ LogDO2 - Is simple Discord OAuth2 login implementation for Minecraft servers.
 ## Features
 - Discord OAuth2 linking: Chat link for Java; one‑time code + DM flow for Bedrock.
 - IP confirmation: Owner receives a Discord DM to confirm/reject logins from new IPs.
-- Floodgate support: Automatically detects Bedrock and guides them through the code flow.
+- Floodgate support (Bedrock players can join and authorise too).
 - Progressive bans: Auto‑increasing temporary bans on rejected/abusive attempts.
-- Paper & Folia compatible: Uses Folia-safe scheduling where available.
+- Paper & Folia compatible.
 - Multi‑DB support: SQLite (default), MySQL, PostgreSQL with auto migrations.
-- Admin tools: Commands for linking/unlinking, forgiving IP bans, and quick reload.
+- Admin tools: Commands for linking/unlinking, IP bans, lookups, and quick reload.
 
 ## Configuration (`config.yml`)
 - `web.port`: HTTP port for the embedded server (default `8080`).
 - `web.publicUrl`: Base public URL used to build login links and redirect URIs.
 - `discord.botToken`: Your bot token (required). `targetGuildId`/`inviteChannelId` for post-login invites.
+- `discord.intents`: List of intents (what information bot can get and cache without directly requesting it)
+- `discord.enableCacheChunking`: Allow JDA (Discord bot backend for LogDO2) to store cache in chunks, might be useful for large discord servers
+- `discord.cacheAllGuildMembers`: Allow JDA to retrieve and store discord servers members in memory, require GUILD_MEMBERS intent, also might cause huge memory usage on large discord servers.
 - `oauth.clientId` / `oauth.clientSecret` / `oauth.scopes`: Discord OAuth2 credentials and scopes.
 - `database`: JDBC configuration; examples for SQLite/MySQL/Postgres are included in the file.
 - `security.tokenEncryptionKeyBase64`: Base64-encoded 32-byte key to encrypt access/refresh tokens.
@@ -28,7 +31,7 @@ LogDO2 - Is simple Discord OAuth2 login implementation for Minecraft servers.
 Messages are in `messages.yml`.
 
 ## Security
-Sensitive tokens are stored encrypted (AES). Generate your own 32‑byte key and set `security.tokenEncryptionKeyBase64`.
+Sensitive tokens are stored encrypted (using AES). Generate your own 32‑byte key and set `security.tokenEncryptionKeyBase64`.
 
 Example (Linux/macOS):
 `openssl rand -base64 32`
@@ -45,6 +48,7 @@ Keep this key secret. Changing it will invalidate stored tokens.
 
 ## Commands & Permissions
 - `/logdo2 help`: Show help.
+- `.logdo2 lookup <player_uuid|discord_id|player_name>`: Get all info that plugin can get from player/discord member.
 - `/logdo2 link <player_uuid> <discord_id>`: Reserve/link a player for a Discord user (OAuth still required).
 - `/logdo2 logout <player|uuid|discord_id>`: Unlink target; kicks online players linked to that Discord.
 - `/logdo2 logout <discord_id> <player|uuid>`: Unlink only that mapping.
@@ -52,7 +56,7 @@ Keep this key secret. Changing it will invalidate stored tokens.
 - `/logdo2 bypass <player|uuid>`: Allow profile to ignore per-Discord limit (OAuth still required)
 - `/logdo2 reload`: Reload config and messages.
 
-Permission: `logdo2.admin` (children: `logdo2.admin.link`, `logout`, `forgive`, `bypass`, `reload`).
+Permission: `logdo2.admin` (children: `logdo2.admin.link`, `logout`, `forgive`, `bypass`, `lookup`, `reload`).
 
 ## API
 Currently not tested at any projects, but exists!
@@ -79,6 +83,14 @@ A: Unfortunately, Bedrock players do not have clickable links in the chat, which
 Q: What SUNSHINE and MOONLIGHT builds means?
 
 A: These are builds where we add new functionality that is not yet tested to be included in stable releases. SUNSHINE and MOONLIGHT simply indicate when the version was released during the day or at night.
+
+Q: Is plugin going to be released on SpigotMC or other platforms?
+
+A: Maybe... idk
+
+Q: Is plugin fully free?
+
+A: Yes! LogDO2 will remain free and open source. It will NEVER have any “premium features”. If you want to support the project author financially, you can do so [here](https://send.monobank.ua/jar/qc7goaLVT)
 
 ## License
 Copyright (C) 2025 Beengoo
