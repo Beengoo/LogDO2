@@ -1,5 +1,7 @@
 package ua.beengoo.logdo2.plugin.util;
 
+import ua.beengoo.logdo2.api.security.EncryptionProvider;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
@@ -7,7 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 import java.util.Base64;
 
-public record EncryptionManager(SecretKey key) {
+public record EncryptionManager(SecretKey key) implements EncryptionProvider {
     private static final String ALG = "AES/GCM/NoPadding";
     private static final int GCM_TAG_BITS = 128;
     private static final int IV_LEN = 12;
