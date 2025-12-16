@@ -1,6 +1,13 @@
 package ua.beengoo.logdo2.api.entity;
 
-public interface LinkInfo {
-    DiscordProfile getDiscordProfile();
-    MinecraftProfile getMinecraftProfile();
+public class LinkInfo implements BaseLinkInfo{
+    @Override
+    public DiscordProfile getDiscordProfile() {
+        return null;
+    }
+
+    @Override
+    public BaseMinecraftProfile getMinecraftProfile() {
+        return null;
+    }
 }

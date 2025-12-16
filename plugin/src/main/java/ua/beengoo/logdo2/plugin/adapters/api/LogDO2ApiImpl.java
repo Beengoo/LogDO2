@@ -2,10 +2,12 @@ package ua.beengoo.logdo2.plugin.adapters.api;
 
 import lombok.Setter;
 import net.dv8tion.jda.api.JDA;
+import org.bukkit.OfflinePlayer;
 import ua.beengoo.logdo2.api.DiscordAccount;
 import ua.beengoo.logdo2.api.LogDO2Api;
 import ua.beengoo.logdo2.api.MinecraftProfile;
 import ua.beengoo.logdo2.api.SessionView;
+import ua.beengoo.logdo2.api.entity.LogDO2Profile;
 import ua.beengoo.logdo2.api.ports.AccountsRepo;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.api.ports.ProfileRepo;
@@ -38,6 +40,22 @@ public class LogDO2ApiImpl implements LogDO2Api {
     }
 
     @Override
+    public LogDO2Profile getProfile(Long discordId) {
+
+        return null;
+    }
+
+    @Override
+    public LogDO2Profile getProfile(UUID minecraftUUID) {
+        return null;
+    }
+
+    @Override
+    public LogDO2Profile getProfile(OfflinePlayer player) {
+        return null;
+    }
+
+    @Override
     public boolean isLinked(UUID uuid) {
         return accounts.isLinked(uuid);
     }
@@ -64,7 +82,7 @@ public class LogDO2ApiImpl implements LogDO2Api {
 
     @Override
     public DiscordAccount getDiscordAccount(long discordId) {
-        // keep order: accounts.findProfilesForDiscord returns a Set — if you need order, ensure repo uses LinkedHashSet
+        // keep order: accounts.findProfilesForDiscord returns a Set
         List<DiscordAccount.MinecraftProfileSummary> summaries = accounts.findProfilesForDiscord(discordId).stream()
                 .map(uuid -> {
                     String name = profiles.findNameByUuid(uuid).orElse(null);

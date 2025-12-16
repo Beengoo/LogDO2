@@ -2,11 +2,14 @@ package ua.beengoo.logdo2.api.entity;
 
 import org.bukkit.OfflinePlayer;
 
-public interface MinecraftProfile {
-    OfflinePlayer getPlayer();
+public class MinecraftProfile implements BaseMinecraftProfile{
+    @Override
+    public OfflinePlayer getPlayer() {
+        return null;
+    }
 
-    /**
-     * @return Last validated player IP address.
-     */
-    String getLastValidIp();
+    @Override
+    public String getLastValidIp() {
+        return "";
+    }
 }

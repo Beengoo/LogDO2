@@ -1,25 +1,44 @@
 package ua.beengoo.logdo2.api.entity;
 
-
 import java.util.List;
 
-/**
- * Generic LogDO2 Profile interface
- * */
-public interface LogDO2Profile {
+public class LogDO2Profile implements BaseLogDO2Profile{
 
+    private final String profileId;
+    private final DiscordProfile discordProfile;
+    private LogDO2ProfileStatus profileStatus;
+    private final List<LinkInfo> linkInfoList;
 
-    /**
-     * Returns profile id which contains hashed discord id and login timestamp
-     * @return LogDO2 profile id if exists
-     */
-    String getProfileId();
+    public LogDO2Profile(String profileId, DiscordProfile discordProfile,
+                         LogDO2ProfileStatus profileStatus, List<LinkInfo> linkInfoList){
+        this.profileId = profileId;
+        this.discordProfile = discordProfile;
+        this.profileStatus = profileStatus;
+        this.linkInfoList = linkInfoList;
+    }
 
-    /**
-     * @return LogDO2 profile status if profile exists
-     */
-    LogDO2ProfileStatus getProfileStatus();
+    @Override
+    public DiscordProfile getDiscordProfile() {
+        return discordProfile;
+    }
 
-    List<LinkInfo> getLinkInfo();
+    @Override
+    public String getProfileId() {
+        return profileId;
+    }
 
+    @Override
+    public LogDO2ProfileStatus getProfileStatus() {
+        return profileStatus;
+    }
+
+    @Override
+    public List<LinkInfo> getLinkInfo() {
+        return linkInfoList;
+    }
+
+    @Override
+    public void setProfileStatus(LogDO2ProfileStatus status) {
+        profileStatus = status;
+    }
 }
