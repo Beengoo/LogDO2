@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class LogDO2Command implements CommandExecutor, TabCompleter {
     private static final DateTimeFormatter LOOKUP_DT = DateTimeFormatter.ofPattern("dd-MM-yy hh:mm a", Locale.ENGLISH);
-    private static final List<String> SUBS = List.of("help", "link", "logout", "forgive", "bypass", "reload");
+    private static final List<String> SUBS = List.of("help", "lookup", "link", "logout", "forgive", "bypass", "reload");
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private final AccountsRepo accountsRepo;
     private final ProfileRepo profileRepo;

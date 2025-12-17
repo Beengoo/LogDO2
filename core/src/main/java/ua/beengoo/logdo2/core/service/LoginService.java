@@ -1,23 +1,15 @@
 package ua.beengoo.logdo2.core.service;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.title.Title;
+import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import ua.beengoo.logdo2.api.events.LoginPhase;
-import ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent;
-import ua.beengoo.logdo2.api.events.PlayerLoginPhaseEnterEvent;
-import ua.beengoo.logdo2.api.events.PlayerLoginPhaseExitEvent;
+import ua.beengoo.logdo2.api.events.*;
 import ua.beengoo.logdo2.api.ports.*;
 import ua.beengoo.logdo2.api.provider.Properties;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -40,10 +32,7 @@ public class LoginService {
     private final MessagesPort msg;
     private IpPolicyPort ipPolicy;
 
-    private static final MiniMessage MINI = MiniMessage.miniMessage();
-
     private final PropertiesProvider propertiesProvider;
-
     private final BanProgressRepo banProgressRepo;
 
     public LoginService(OAuthPort oauth, DiscordDmPort dm,
@@ -81,24 +70,16 @@ public class LoginService {
         Properties props = propertiesProvider.getSnapshot();
 
         if (!accounts.isLinked(uuid)) {
-            state.markPendingLogin(uuid, currentIp, bedrock);
             if (bedrock) {
-                String code = state.recentBedrockCodeAfterLeave(uuid, java.time.Duration.ofSeconds(props.bedrockCodeTimeAfterLeave))
+                String code = state.recentBedrockCodeAfterLeave(uuid, Duration.ofSeconds(props.bedrockCodeTimeAfterLeave))
                         .orElseGet(() -> state.createOneTimeCode(uuid, currentIp, name));
                 state.recordBedrockCodeShown(uuid, code);
-                Map<String, String> ph = Map.of("code", code);
-                showLoginPhaseTitle(uuid);
-                sendBedrockHint(uuid, msg.mc("login.bedrock.code_hint", ph));
-                firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
+                state.markPendingLogin(uuid, currentIp, code, true);
+                firePhaseEnter(uuid, LoginPhase.LOGIN, new PlayerLoginPhaseEnterEvent.PlayerLoginData(true, code));
             } else {
                 String token = state.createOAuthState(uuid, currentIp, name, false);
-                String loginUrl = publicUrl + "/login?state=" + token;
-                showLoginPhaseTitle(uuid);
-                sendClickableAuth(uuid,
-                        msg.mc("chat.auth_link_text"),
-                        msg.mc("chat.auth_link_hover"),
-                        loginUrl);
-                firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
+                firePhaseEnter(uuid, LoginPhase.LOGIN, new PlayerLoginPhaseEnterEvent.PlayerLoginData(false, token));
+                state.markPendingLogin(uuid, currentIp, token, false);
             }
             return;
         }
@@ -108,12 +89,8 @@ public class LoginService {
             long discordId = accounts.findDiscordForProfile(uuid).orElseThrow();
             state.markPendingIpConfirm(uuid, currentIp, discordId);
             if (dm != null) dm.sendIpConfirmDm(discordId, uuid, name, currentIp);
-            showIpConfirmPhaseTitle(uuid);
-            firePhaseEnter(uuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
-            return;
+            firePhaseEnter(uuid, LoginPhase.IP_CONFIRM, null);
         }
-
-        sendActionBar(uuid, msg.mc("login.linked.actionbar"));
     }
 
     public boolean isActionAllowed(UUID uuid, String currentIp) {
@@ -184,12 +161,10 @@ public class LoginService {
         profiles.updateLastConfirmedIp(st.uuid(), st.ip());
         profiles.updatePlatform(st.uuid(), st.bedrock() ? "BEDROCK" : "JAVA");
 
-        Map<String, String> ph = Map.of("name", st.name());
-        sendActionBar(st.uuid(), msg.mc("oauth.linked_actionbar", ph));
         if (dm != null) dm.sendFirstLoginDm(user.id(), st.uuid(), st.name(), publicUrl);
         state.clearPendingLogin(st.uuid());
-        clearPhaseTitle(st.uuid());
-        firePhaseExit(st.uuid(), ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
+
+        firePhaseExit(st.uuid(), LoginPhase.LOGIN, LoginExitReason.LOGIN_SUCCESS);
     }
 
     public void onDiscordIpConfirm(UUID profileUuid, long discordUserId) {
@@ -202,9 +177,6 @@ public class LoginService {
         if (pending == null) return;
 
         profiles.updateLastConfirmedIp(profileUuid, pending.newIp());
-        sendActionBar(profileUuid, msg.mc("ip.confirm_actionbar"));
-        clearPhaseTitle(profileUuid);
-
         // Fire Bukkit event for integrations (main thread, only if player online)
         runPlayer(profileUuid, p -> {
             try {
@@ -212,7 +184,7 @@ public class LoginService {
                         .callEvent(new PlayerIpConfirmedEvent(p, pending.newIp()));
             } catch (Throwable ignored) {}
         });
-        firePhaseExit(profileUuid, LoginPhase.IP_CONFIRM);
+        firePhaseExit(profileUuid, LoginPhase.IP_CONFIRM, LoginExitReason.IP_CONFIRM_CONFIRMED);
     }
 
     public void onDiscordIpReject(UUID profileUuid, long discordUserId) {
@@ -221,14 +193,8 @@ public class LoginService {
             log.warning("IP reject by non-owner. profile=" + profileUuid + " by " + discordUserId);
             return;
         }
-        var pending = state.consumePendingIpConfirm(profileUuid);
-        if (pending == null) return;
 
-        long durSec = applyProgressiveBan(pending.newIp());
-        Map<String, String> ph = Map.of("duration", formattedDuration(durSec));
-        sendActionBar(profileUuid, msg.mc("ip.reject_actionbar", ph));
-        kick(profileUuid, msg.mc("ip.reject_kick", ph));
-        firePhaseExit(profileUuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
+        firePhaseExit(profileUuid, LoginPhase.IP_CONFIRM, LoginExitReason.IP_CONFIRM_REJECT);
     }
 
     public boolean onDiscordSlashLogin(String code, long discordUserId) {
@@ -260,107 +226,16 @@ public class LoginService {
 
     public void onLoginTimeout(UUID uuid) {
         state.clearPendingLogin(uuid);
-        kick(uuid, msg.mc("timeouts.login_kick"));
-        firePhaseExit(uuid, ua.beengoo.logdo2.api.events.LoginPhase.LOGIN);
+        //kick(uuid, msg.mc("timeouts.login_kick"));
+        firePhaseExit(uuid, LoginPhase.LOGIN, LoginExitReason.LOGIN_TIMEOUT);
     }
 
     public void onIpConfirmTimeout(UUID uuid) {
         state.consumePendingIpConfirm(uuid);
-        kick(uuid, msg.mc("timeouts.ip_kick"));
-        firePhaseExit(uuid, ua.beengoo.logdo2.api.events.LoginPhase.IP_CONFIRM);
-    }
-
-    // === Progressive bans (only ban_progress table) ===
-    private long applyProgressiveBan(String ip) {
-        Properties props = propertiesProvider.getSnapshot();
-        if (!props.bansEnabled || ip == null || ip.isBlank()) return 0L;
-
-        long now = System.currentTimeMillis() / 1000;
-        var recOpt = banProgressRepo.findByIp(ip);
-        int attempts = 0;
-        long lastAttempt;
-
-        if (recOpt.isPresent()) {
-            var rec = recOpt.get();
-            attempts = rec.attempts();
-            lastAttempt = rec.lastAttemptEpochSec();
-            if (props.banTrackWindowSec > 0 && now - lastAttempt > props.banTrackWindowSec) {
-                attempts = 0;
-            }
-        }
-
-        attempts += 1;
-        double pow = Math.pow(props.banMultiplier, Math.max(0, attempts - 1));
-        long dur = (long) Math.floor(props.banBaseSec * pow);
-        if (dur > props.banMaxSec) dur = props.banMaxSec;
-
-        long untilSec = now + dur;
-        banProgressRepo.upsert(ip, attempts, now, untilSec);
-        return dur;
+        firePhaseExit(uuid, LoginPhase.IP_CONFIRM, LoginExitReason.IP_CONFIRM_TIMEOUT);
     }
 
     // === Components & main-thread helpers ===
-    private void sendClickableAuth(UUID uuid, String text, String hover, String loginUrl) {
-        runPlayer(uuid, p -> {
-            Component comp = MINI.deserialize(text)
-                    .hoverEvent(HoverEvent.showText(MINI.deserialize(hover)))
-                    .clickEvent(ClickEvent.openUrl(loginUrl));
-            p.sendMessage(comp);
-        });
-    }
-
-    private void sendBedrockHint(UUID uuid, String line) {
-        runPlayer(uuid, p -> p.sendMessage(line));
-    }
-
-    private void sendTitle(UUID uuid, String title, String subtitle) {
-        runPlayer(uuid, p -> p.showTitle(
-                Title.title(
-                        MINI.deserialize(title),
-                        MINI.deserialize(subtitle),
-                        Title.Times.times(Duration.ZERO, Duration.of(24, ChronoUnit.HOURS), Duration.ZERO)
-                )
-        ));
-    }
-
-    public void showLoginPhaseTitle(UUID uuid) {
-        sendTitle(uuid, msg.mc("login.first_join.title"), msg.mc("login.first_join.subtitle"));
-    }
-
-    public void showIpConfirmPhaseTitle(UUID uuid) {
-        sendTitle(uuid, msg.mc("ip.unconfirmed.title"), msg.mc("ip.unconfirmed.subtitle"));
-    }
-
-    public void clearPhaseTitle(UUID uuid) {
-        runPlayer(uuid, p -> {
-            try { p.clearTitle(); } catch (Throwable ignored) { /* older API fallback */ }
-            try { p.resetTitle(); } catch (Throwable ignored) { /* older API fallback */ }
-        });
-    }
-
-    private void sendActionBar(UUID uuid, String msgLine) {
-        runPlayer(uuid, p -> p.sendActionBar(MINI.deserialize(msgLine)));
-    }
-
-    private void kick(UUID uuid, String reason) {
-        try {
-            Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null) {
-                    try {
-                        p.getScheduler().execute(plugin, () -> p.kick(MINI.deserialize(reason)), null, 1L);
-                    } catch (Throwable ignored) {
-                        p.kick(MINI.deserialize(reason));
-                    }
-                }
-            });
-        } catch (Throwable ignored) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null) p.kick(MINI.deserialize(reason));
-            }, 1L);
-        }
-    }
 
     public Optional<String> disallowReasonOnLogin(UUID uuid) {
         Properties props = propertiesProvider.getSnapshot();
@@ -377,6 +252,24 @@ public class LoginService {
             }
         }
         return Optional.empty();
+    }
+
+    private void firePhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginPhaseEnterEvent.PlayerLoginData data) {
+        runPlayer(uuid, p -> {
+            try {
+                org.bukkit.Bukkit.getPluginManager()
+                        .callEvent(new PlayerLoginPhaseEnterEvent(p, phase, data));
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    private void firePhaseExit(UUID uuid, LoginPhase phase, LoginExitReason cause) {
+        runPlayer(uuid, p -> {
+            try {
+                org.bukkit.Bukkit.getPluginManager()
+                        .callEvent(new PlayerLoginPhaseExitEvent(p, phase, cause));
+            } catch (Throwable ignored) {}
+        });
     }
 
     private void runPlayer(UUID uuid, Consumer<Player> action) {
@@ -404,36 +297,5 @@ public class LoginService {
                 if (p != null) action.accept(p);
             });
         }
-    }
-
-    private void firePhaseEnter(UUID uuid, LoginPhase phase) {
-        runPlayer(uuid, p -> {
-            try {
-                org.bukkit.Bukkit.getPluginManager()
-                        .callEvent(new PlayerLoginPhaseEnterEvent(p, phase));
-            } catch (Throwable ignored) {}
-        });
-    }
-
-    private void firePhaseExit(UUID uuid, LoginPhase phase) {
-        runPlayer(uuid, p -> {
-            try {
-                org.bukkit.Bukkit.getPluginManager()
-                        .callEvent(new PlayerLoginPhaseExitEvent(p, phase));
-            } catch (Throwable ignored) {}
-        });
-    }
-
-    private static String formattedDuration(long seconds) {
-        long s = seconds;
-        long d = s / 86400; s %= 86400;
-        long h = s / 3600;  s %= 3600;
-        long m = s / 60;    s %= 60;
-        StringBuilder sb = new StringBuilder();
-        if (d > 0) sb.append(d).append("d ");
-        if (h > 0) sb.append(h).append("h ");
-        if (m > 0) sb.append(m).append("m ");
-        if (d == 0 && h == 0) sb.append(s).append("s");
-        return sb.toString().trim();
     }
 }

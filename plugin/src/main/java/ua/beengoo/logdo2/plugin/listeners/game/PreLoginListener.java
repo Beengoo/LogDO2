@@ -1,4 +1,4 @@
-package ua.beengoo.logdo2.plugin.listeners;
+package ua.beengoo.logdo2.plugin.listeners.game;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.event.EventHandler;

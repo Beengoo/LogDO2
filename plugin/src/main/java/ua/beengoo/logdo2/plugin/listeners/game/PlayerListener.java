@@ -1,4 +1,4 @@
-package ua.beengoo.logdo2.plugin.listeners;
+package ua.beengoo.logdo2.plugin.listeners.game;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -9,10 +9,12 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.plugin.Plugin;
+import ua.beengoo.logdo2.api.events.LoginPhase;
 import ua.beengoo.logdo2.api.events.PlayerIpCheckEvent;
 import ua.beengoo.logdo2.api.events.PlayerPostLoginCheckEvent;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.plugin.actions.Action;
 import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
@@ -53,7 +55,7 @@ public class PlayerListener implements Listener {
         var reasonOpt = loginService.disallowReasonOnLogin(p.getUniqueId());
         boolean allowed = reasonOpt.isEmpty();
         try {
-            org.bukkit.Bukkit.getPluginManager().callEvent(
+            Bukkit.getPluginManager().callEvent(
                     new PlayerPostLoginCheckEvent(p, ip, bedrock, allowed, reasonOpt.orElse(null))
             );
         } catch (Throwable ignored) {}
@@ -103,20 +105,40 @@ public class PlayerListener implements Listener {
     // === BLOCKERS ===
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onMove(PlayerMoveEvent e) {
-        if (!isAllowed(e.getPlayer(), Action.MOVE)) e.setCancelled(true);
+        if (!isAllowed(e.getPlayer(), Action.MOVE)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
+                if (state.getLoginPhase(e.getPlayer().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getPlayer().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getPlayer().getUniqueId());
+            }
+            e.setCancelled(true);
+        }
         else refreshVisuals(e.getPlayer());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent e) {
         if (!isAllowed(e.getPlayer(), Action.INTERACT)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
+                if (state.getLoginPhase(e.getPlayer().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getPlayer().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getPlayer().getUniqueId());
+            }
             e.setCancelled(true);
         } else refreshVisuals(e.getPlayer());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onChat(AsyncChatEvent e) {
-        if (!isAllowed(e.getPlayer(), Action.CHAT)) e.setCancelled(true);
+        if (!isAllowed(e.getPlayer(), Action.CHAT)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
+                if (state.getLoginPhase(e.getPlayer().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getPlayer().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getPlayer().getUniqueId());
+            }
+            e.setCancelled(true);
+        }
+
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -124,26 +146,54 @@ public class PlayerListener implements Listener {
         Player p = e.getPlayer();
         String msg = e.getMessage();
         String root = extractRootCommand(msg);
-        if (!isCommandAllowed(p, root)) e.setCancelled(true);
+        if (!isCommandAllowed(p, root)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
+                if (state.getLoginPhase(e.getPlayer().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getPlayer().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getPlayer().getUniqueId());
+            }
+            e.setCancelled(true);
+        }
         else refreshVisuals(p);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onDrop(PlayerDropItemEvent e) {
-        if (!isAllowed(e.getPlayer(), Action.DROP)) e.setCancelled(true);
+        if (!isAllowed(e.getPlayer(), Action.DROP)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
+                if (state.getLoginPhase(e.getPlayer().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getPlayer().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getPlayer().getUniqueId());
+            }
+            e.setCancelled(true);
+        }
         else refreshVisuals(e.getPlayer());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onInventory(InventoryOpenEvent e) {
-        if (e.getPlayer() instanceof Player p && !isAllowed(p, Action.INVENTORY)) e.setCancelled(true);
+        if (e.getPlayer() instanceof Player p && !isAllowed(p, Action.INVENTORY)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock((Player) e.getPlayer())) {
+                if (state.getLoginPhase(e.getPlayer().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getPlayer().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getPlayer().getUniqueId());
+            }
+            e.setCancelled(true);
+        }
         else if (e.getPlayer() instanceof Player p) refreshVisuals(p);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onDamage(EntityDamageEvent e) {
         if (!(e.getEntity() instanceof Player p)) return;
-        if (!isAllowed(p, Action.DAMAGE)) e.setCancelled(true);
+        if (!isAllowed(p, Action.DAMAGE)) {
+            if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock((Player) e.getEntity())) {
+                if (state.getLoginPhase(e.getEntity().getUniqueId()).equals(LoginPhase.IP_CONFIRM))
+                    ua.beengoo.logdo2.plugin.actions.Action.showConfirmPhaseDialog(e.getEntity().getUniqueId());
+                else ua.beengoo.logdo2.plugin.actions.Action.showLoginPhaseDialog(e.getEntity().getUniqueId());
+            }
+            e.setCancelled(true);
+        }
         else refreshVisuals(p);
     }
 

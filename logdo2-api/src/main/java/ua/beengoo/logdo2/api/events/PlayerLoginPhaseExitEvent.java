@@ -1,6 +1,7 @@
 package ua.beengoo.logdo2.api.events;
 
 import lombok.Getter;
+import lombok.NonNull;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -15,10 +16,12 @@ public class PlayerLoginPhaseExitEvent extends Event {
 
     private final Player player;
     private final LoginPhase phase;
+    private final @NonNull LoginExitReason loginExitReason;
 
-    public PlayerLoginPhaseExitEvent(@NotNull Player player, @NotNull LoginPhase phase) {
+    public PlayerLoginPhaseExitEvent(@NotNull Player player, @NotNull LoginPhase phase, @NonNull LoginExitReason loginExitReason) {
         this.player = player;
         this.phase = phase;
+        this.loginExitReason = loginExitReason;
     }
 
     @Override public @NotNull HandlerList getHandlers() { return HANDLERS; }

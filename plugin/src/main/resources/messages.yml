@@ -5,25 +5,33 @@ prelogin:
 
 login:
   first_join:
+    dialog:
+      title: "<#ffcc00>Authorize via Discord</#ffcc00>"
+      body: "Please use your Discord account to link your Minecraft and Discord accounts on server."
+      actions:
+        authorize: "Authorize"
+        close: "I want to take a look at the server"
     title: "<#ffcc00>Authorize via Discord</#ffcc00>"
     subtitle: "<gray>Click the chat link to link your account</gray>"
     click_text: "<yellow>[Click here to authorize]</yellow>"
-    click_hover: "Open Discord OAuth2"
+    click_hover: "Open Discord authorization page"
   bedrock:
-    code_hint: "<yellow>Open Discord and run </yellow><aqua>/login {code}</aqua><yellow> with the bot.</yellow>"
-  linked:
-    actionbar: "<green>Login valid</green>"
+    # Bedrock connections are not supported MINI color formats in chat (but somehow support in on titles...)
+    code_hint: "Go to our official discord server, find our bot, open dm and run /login {code} command."
+  linked_actionbar: "<green>Welcome!</green>"
 
 ip:
   unconfirmed:
+    dialog:
+      title: "<#ffcc00>Confirm your location!</#ffcc00>"
+      body: "Your location (IP address) is changed!\nPlease check your Discord DM to confirm your new location."
+      actions:
+        bot_profile: "Open bot profile"
+        close: "Close"
     title: "<red>IP not confirmed</red>"
     subtitle: "<gray>Check your Discord DM</gray>"
-  confirm_actionbar: "<green>IP confirmed. You can play now.</green>"
-  reject_actionbar: "<red>Login rejected. IP banned for {duration}.</red>"
+  confirm_actionbar: "<green>IP confirmed.</green>"
   reject_kick: "<red>Login rejected by account owner. Ban {duration}.</red>"
-
-oauth:
-  linked_actionbar: "<green>Discord linked. Welcome, {name}!</green>"
 
 timeouts:
   login_kick: "<red>Login timed out. Please rejoin to try again.</red>"

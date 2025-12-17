@@ -51,7 +51,7 @@ class LoginStateServiceTest {
     void pendingLoginAndIpFlags() {
         var svc = new LoginStateService(props);
         var uuid = UUID.randomUUID();
-        svc.markPendingLogin(uuid, "1.2.3.4", false);
+        svc.markPendingLogin(uuid, "1.2.3.4", "totally secret token", false);
         assertTrue(svc.isPendingLogin(uuid));
         svc.clearPendingLogin(uuid);
         assertFalse(svc.isPendingLogin(uuid));

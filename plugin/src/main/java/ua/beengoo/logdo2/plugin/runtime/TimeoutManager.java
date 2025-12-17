@@ -5,6 +5,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.plugin.LogDO2;
+import ua.beengoo.logdo2.plugin.actions.Action;
+import ua.beengoo.logdo2.plugin.config.Config;
+import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -97,7 +101,16 @@ public class TimeoutManager {
 
             Long last = lastLoginTitle.get(uuid);
             if (last == null || nowSec - last >= 5) {
-                runOnPlayerThread(uuid, () -> service.showLoginPhaseTitle(uuid));
+                runOnPlayerThread(uuid, () -> {
+                            if (!(Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !LogDO2.getInstance().getFloodgateHook().isBedrock(uuid))) {
+                                Action.showLoginPhaseTitle(uuid);
+                                if (p.bedrock()) {
+                                    Action.sendBedrockHint(uuid, p.token());
+                                } else {
+                                    Action.sendClickableAuth(uuid, p.token());
+                                }
+                            }
+                });
                 lastLoginTitle.put(uuid, nowSec);
             }
         }
@@ -112,7 +125,11 @@ public class TimeoutManager {
 
             Long last = lastIpTitle.get(uuid);
             if (last == null || nowSec - last >= 5) {
-                runOnPlayerThread(uuid, () -> service.showIpConfirmPhaseTitle(uuid));
+                runOnPlayerThread(uuid, () -> {
+                    if (!(Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !LogDO2.getInstance().getFloodgateHook().isBedrock(uuid))){
+                        Action.showIpConfirmPhaseTitle(uuid);
+                    }
+                });
                 lastIpTitle.put(uuid, nowSec);
             }
         }

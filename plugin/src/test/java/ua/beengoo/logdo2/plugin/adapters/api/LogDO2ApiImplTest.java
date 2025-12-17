@@ -45,7 +45,7 @@ class LogDO2ApiImplTest {
         accounts.addActiveProfile(activeDiscord, primary);
         accounts.addActiveProfile(activeDiscord, alt);
 
-        state.markPendingLogin(primary, "5.5.5.5", true);
+        state.markPendingLogin(primary, "5.5.5.5", "totally secret token", true);
         state.markPendingIpConfirm(primary, "20.0.0.1", activeDiscord);
         state.grantLimitBypass(primary);
 

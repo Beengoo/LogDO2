@@ -3,12 +3,12 @@ package ua.beengoo.logdo2.api.ports;
 import java.util.UUID;
 
 public interface DiscordDmPort {
-    /** Перше прив’язування — інформуємо користувача. */
+    /** First account link message */
     void sendFirstLoginDm(long discordId, UUID mcUuid, String playerName, String publicUrl);
 
-    /** Підтвердження IP — тепер з ім’ям гравця. */
+    /** IP Confirm message */
     void sendIpConfirmDm(long discordId, UUID mcUuid, String playerName, String newIp);
 
-    /** Для Bedrock: відправляємо лінк на завершення OAuth. */
+    /** For Bedrock: Send oAuth2 link in DM */
     void sendFinalizeOAuthLink(long discordId, String url);
 }

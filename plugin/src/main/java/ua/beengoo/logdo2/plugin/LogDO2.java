@@ -27,8 +27,9 @@ import ua.beengoo.logdo2.plugin.discord.JdaDiscordButtonListener;
 import ua.beengoo.logdo2.plugin.discord.JdaSlashLoginListener;
 import ua.beengoo.logdo2.plugin.discord.SlashCommandRegistrar;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
-import ua.beengoo.logdo2.plugin.listeners.PlayerListener;
-import ua.beengoo.logdo2.plugin.listeners.PreLoginListener;
+import ua.beengoo.logdo2.plugin.listeners.LogDO2Listener;
+import ua.beengoo.logdo2.plugin.listeners.game.PlayerListener;
+import ua.beengoo.logdo2.plugin.listeners.game.PreLoginListener;
 import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 import ua.beengoo.logdo2.plugin.listeners.ReloadListener;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
@@ -48,6 +49,10 @@ import java.util.Objects;
 
 @Slf4j
 public final class LogDO2 extends JavaPlugin {
+
+    @Getter
+    private static LogDO2 instance;
+
     @Getter
     private JDA jda;
     @Getter
@@ -67,6 +72,7 @@ public final class LogDO2 extends JavaPlugin {
     private ProfileRepo profileRepo;
     @Getter
     private TokensRepo tokensRepo;
+    @Getter
     private YamlMessages messages;
     @Getter
     private DiscordUserRepo discordUserRepo;
@@ -75,12 +81,16 @@ public final class LogDO2 extends JavaPlugin {
     @Getter
     private LoginStatePort loginStatePort;
 
+    @Getter
+    private FloodgateHook floodgateHook;
+
     private DatabaseManager db;
     @Getter
     private LogDO2ApiImpl logdo2API;
 
     @Override
     public void onEnable() {
+        instance = this;
         Config.init(this);
         saveDefaultConfig();
         Config.updateConfigDefaults();
@@ -185,10 +195,11 @@ public final class LogDO2 extends JavaPlugin {
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 
-        FloodgateHook floodgate = new FloodgateHook();
-        if (floodgate.isPresent()) log.info("Floodgate is supported!");
+        this.floodgateHook = new FloodgateHook();
+        if (this.floodgateHook.isPresent()) log.info("Floodgate is supported!");
+        Bukkit.getPluginManager().registerEvents(new LogDO2Listener(), this);
         Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages, audit), this);
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, floodgate, loginStatePort, this, audit), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, this.floodgateHook, loginStatePort, this, audit), this);
         Bukkit.getPluginManager().registerEvents(new ReloadListener(this), this);
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,

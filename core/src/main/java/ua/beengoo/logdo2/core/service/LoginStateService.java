@@ -1,5 +1,6 @@
 package ua.beengoo.logdo2.core.service;
 
+import ua.beengoo.logdo2.api.events.LoginPhase;
 import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.api.provider.PropertiesProvider;
 import ua.beengoo.logdo2.api.provider.Properties;
@@ -47,6 +48,13 @@ public class LoginStateService implements LoginStatePort {
     public boolean hasOAuthState(String token) {
         pruneStates();
         return oauthStates.containsKey(token);
+    }
+
+    @Override
+    public LoginPhase getLoginPhase(UUID uuid) {
+        if (pendingIp.containsKey(uuid)) return LoginPhase.IP_CONFIRM;
+        if (pendingLogin.containsKey(uuid)) return LoginPhase.LOGIN;
+        return null;
     }
 
     @Override
@@ -103,8 +111,8 @@ public class LoginStateService implements LoginStatePort {
     }
 
     @Override
-    public void markPendingLogin(UUID uuid, String ip, boolean bedrock) {
-        pendingLogin.put(uuid, new PendingLogin(uuid, ip, bedrock, Instant.now()));
+    public void markPendingLogin(UUID uuid, String ip, String token, boolean bedrock) {
+        pendingLogin.put(uuid, new PendingLogin(uuid, ip, bedrock, token, Instant.now()));
     }
 
     @Override

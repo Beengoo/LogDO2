@@ -2,6 +2,11 @@ web:
   port: 8080
   publicUrl: "http://localhost:8080"
 
+advanced:
+  # Use Minecraft dialogs feature instead of titles and chat messages
+  # If you allow players to move, they also can close dialog window but any other restricted action will show it again
+  useDialogs: true
+
 discord:
   botToken: "YOUR_BOT_TOKEN"
   # Used when postLogin.action == discord-invite

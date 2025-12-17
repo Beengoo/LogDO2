@@ -1,5 +1,7 @@
 package ua.beengoo.logdo2.api.ports;
 
+import ua.beengoo.logdo2.api.events.LoginPhase;
+
 import java.time.Instant;
 import java.time.Duration;
 import java.util.Collection;
@@ -10,6 +12,7 @@ public interface LoginStatePort {
     String createOAuthState(UUID uuid, String ip, String name, boolean bedrock);
     OAuthState consumeOAuthState(String token);
     boolean hasOAuthState(String token);
+    LoginPhase getLoginPhase(UUID uuid);
 
     // ===== Bedrock: one time codes (/login <code>) =====
     String createOneTimeCode(UUID uuid, String ip, String name);
@@ -23,7 +26,7 @@ public interface LoginStatePort {
     Collection<PendingIp> listPendingIpConfirms();
 
     // ===== First login pending (block an action) =====
-    void markPendingLogin(UUID uuid, String ip, boolean bedrock);
+    void markPendingLogin(UUID uuid, String ip, String token, boolean bedrock);
     boolean isPendingLogin(UUID uuid);
     void clearPendingLogin(UUID uuid);
     /** For timeout checks. */
@@ -51,5 +54,5 @@ public interface LoginStatePort {
     record PendingIp(UUID uuid, String newIp, long discordId, Instant at) {}
     record OAuthState(UUID uuid, String ip, String name, boolean bedrock, Instant at) {}
     record PendingCode(String code, UUID uuid, String ip, String name, Instant at) {}
-    record PendingLogin(UUID uuid, String ip, boolean bedrock, Instant at) {}
+    record PendingLogin(UUID uuid, String ip, boolean bedrock, String token, Instant at) {}
 }
