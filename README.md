@@ -10,6 +10,7 @@ LogDO2 - Is simple Discord OAuth2 login implementation for Minecraft servers.
 - Paper & Folia compatible.
 - Multi‑DB support: SQLite (default), MySQL, PostgreSQL with auto migrations.
 - Admin tools: Commands for linking/unlinking, IP bans, lookups, and quick reload.
+- Dialogs UI (java minecraft 1.21.8 and above)
 
 ## Configuration (`config.yml`)
 - `web.port`: HTTP port for the embedded server (default `8080`).
@@ -27,6 +28,7 @@ LogDO2 - Is simple Discord OAuth2 login implementation for Minecraft servers.
 - `postLogin`: What the browser shows after OAuth (`text`, `discord-invite`, or `redirect`).
 - `gates.login` and `gates.ipConfirm`: What actions are allowed during each phase (movement, chat, commands, etc.).
 - `audit`: Persist LogDO2 actions to a separated log file.
+- `advanced.useDialogs`: Use dialogs UI for java players instead of text messages
 
 Messages are in `messages.yml`.
 

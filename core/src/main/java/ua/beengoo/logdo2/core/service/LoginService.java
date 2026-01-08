@@ -257,7 +257,7 @@ public class LoginService {
     private void firePhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginPhaseEnterEvent.PlayerLoginData data) {
         runPlayer(uuid, p -> {
             try {
-                org.bukkit.Bukkit.getPluginManager()
+                Bukkit.getPluginManager()
                         .callEvent(new PlayerLoginPhaseEnterEvent(p, phase, data));
             } catch (Throwable ignored) {}
         });
@@ -266,7 +266,7 @@ public class LoginService {
     private void firePhaseExit(UUID uuid, LoginPhase phase, LoginExitReason cause) {
         runPlayer(uuid, p -> {
             try {
-                org.bukkit.Bukkit.getPluginManager()
+                Bukkit.getPluginManager()
                         .callEvent(new PlayerLoginPhaseExitEvent(p, phase, cause));
             } catch (Throwable ignored) {}
         });
@@ -279,14 +279,12 @@ public class LoginService {
             return;
         }
         try {
-            // Resolve player on the global scheduler, then switch to player scheduler
             Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null) {
                     try {
                         p.getScheduler().execute(plugin, () -> action.accept(p), null, 0L);
                     } catch (Throwable ignored) {
-                        // If player scheduler is not available, run action immediately (Paper non-Folia)
                         action.accept(p);
                     }
                 }

@@ -21,6 +21,8 @@ import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.net.InetAddress;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 
 public class PlayerListener implements Listener {
@@ -55,9 +57,9 @@ public class PlayerListener implements Listener {
         var reasonOpt = loginService.disallowReasonOnLogin(p.getUniqueId());
         boolean allowed = reasonOpt.isEmpty();
         try {
-            Bukkit.getPluginManager().callEvent(
+            runPlayer(e.getPlayer().getUniqueId(), player -> Bukkit.getPluginManager().callEvent(
                     new PlayerPostLoginCheckEvent(p, ip, bedrock, allowed, reasonOpt.orElse(null))
-            );
+            ));
         } catch (Throwable ignored) {}
         reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, MINI.deserialize(reason)));
     }
@@ -204,8 +206,7 @@ public class PlayerListener implements Listener {
         boolean coreAllowed = loginService.isActionAllowed(p.getUniqueId(), ip);
 
         PlayerIpCheckEvent event = new PlayerIpCheckEvent(p, ip, coreAllowed);
-        Bukkit.getPluginManager().callEvent(event);
-
+        runPlayer(p.getUniqueId(), player -> Bukkit.getPluginManager().callEvent(event));
         boolean finalAllowed;
         if (event.isAllowed() != coreAllowed) {
             finalAllowed = event.isAllowed();
@@ -354,5 +355,30 @@ public class PlayerListener implements Listener {
     private void clearVisuals(Player p) {
         clearBlindness(p);
         showOthers(p);
+    }
+    //TODO: I know I duplicate it, I`m just lazy to make separate utility module, I promise, I`ll make it later
+    private void runPlayer(UUID uuid, Consumer<Player> action) {
+        if (Bukkit.isPrimaryThread()) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) action.accept(p);
+            return;
+        }
+        try {
+            Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) {
+                    try {
+                        p.getScheduler().execute(plugin, () -> action.accept(p), null, 0L);
+                    } catch (Throwable ignored) {
+                        action.accept(p);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) action.accept(p);
+            });
+        }
     }
 }
