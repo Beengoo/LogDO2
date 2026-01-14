@@ -3,5 +3,9 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
     testCompileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
     testRuntimeOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
+
+    // Test dependencies
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
 }
