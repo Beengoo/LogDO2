@@ -9,7 +9,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Fires when player goes truth Ip check stage
- * Allow's to skip ip check stage if allowed was modified.
+ * Allow's to skip ip check stage if allowed flag was modified.
  * */
 @Getter
 public class PlayerIpCheckEvent extends Event {

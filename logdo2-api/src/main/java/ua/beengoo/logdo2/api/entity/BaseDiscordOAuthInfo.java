@@ -10,6 +10,7 @@ public interface BaseDiscordOAuthInfo {
 
     Long getExpiredAt();
     Long getUpdatedAt();
+    Long getCreatedAt();
 
     boolean refreshIfPossible();
 }

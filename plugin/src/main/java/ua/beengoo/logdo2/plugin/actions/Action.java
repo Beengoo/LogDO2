@@ -14,9 +14,9 @@ import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import ua.beengoo.logdo2.api.ports.LoginStatePort;
-import ua.beengoo.logdo2.api.ports.MessagesPort;
-import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.spi.providers.MessagesProvider;
+import ua.beengoo.logdo2.api.spi.providers.Properties;
+import ua.beengoo.logdo2.core.service.LoginStateService;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+@SuppressWarnings("UnstableApiUsage")
 public class Action {
     public static final MiniMessage MINI = MiniMessage.miniMessage();
 
@@ -94,14 +95,12 @@ public class Action {
             return;
         }
         try {
-            // Resolve player on the global scheduler, then switch to player scheduler
             Bukkit.getGlobalRegionScheduler().execute(LogDO2.getInstance(), () -> {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null) {
                     try {
                         p.getScheduler().execute(LogDO2.getInstance(), () -> action.accept(p), null, 0L);
                     } catch (Throwable ignored) {
-                        // If player scheduler is not available, run action immediately (Paper non-Folia)
                         action.accept(p);
                     }
                 }
@@ -173,7 +172,7 @@ public class Action {
             );
             String token = null;
             if (_token == null) {
-                for (LoginStatePort.PendingLogin pl: LogDO2.getInstance().getLoginStatePort().listPendingLogins()) {
+                for (LoginStateService.PendingLogin pl: LogDO2.getInstance().getLoginStatePort().listPendingLogins()) {
                     if (pl.uuid().equals(uniqueId)) {
                         token = pl.token();
                     }
@@ -181,8 +180,7 @@ public class Action {
             } else token = _token;
             String loginUrl = publicUrl + "/login?state=" + token;
             boolean closeable = Config.getFileConfiguration().getBoolean("gates.login.move");
-            MessagesPort m = LogDO2.getInstance().getMessages();
-            // TODO: Idk, make it cleaner or something
+            MessagesProvider m = LogDO2.getInstance().getMessages();
             player.showDialog(Dialog.create(builder -> builder.empty()
                     .base(DialogBase.builder(MINI.deserialize(m.mc("login.first_join.dialog.title")))
                             .body(List.of(DialogBody.plainMessage(MINI.deserialize(m.mc("login.first_join.dialog.body")), 1024)))
@@ -201,8 +199,7 @@ public class Action {
     public static void showConfirmPhaseDialog(@NotNull UUID uniqueId) {
         runPlayer(uniqueId, player -> {
             boolean closeable = Config.getFileConfiguration().getBoolean("gates.ipConfirm.move");
-            MessagesPort m = LogDO2.getInstance().getMessages();
-            // TODO: Idk, make it cleaner or something
+            MessagesProvider m = LogDO2.getInstance().getMessages();
             player.showDialog(Dialog.create(builder -> builder.empty()
                     .base(DialogBase.builder(MINI.deserialize(m.mc("ip.unconfirmed.dialog.title")))
                             .body(List.of(DialogBody.plainMessage(MINI.deserialize(m.mc("ip.unconfirmed.dialog.body")), 1024)))

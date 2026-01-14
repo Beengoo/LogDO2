@@ -33,6 +33,11 @@ public class LogDO2Profile implements BaseLogDO2Profile{
     }
 
     @Override
+    public long getCreatedAt() {
+        return discordProfile.getOAuthInfo().getCreatedAt();
+    }
+
+    @Override
     public List<LinkInfo> getLinkInfo() {
         return linkInfoList;
     }

@@ -1,14 +1,14 @@
 package ua.beengoo.logdo2.plugin.runtime;
 
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.core.service.LoginStateService;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.actions.Action;
 import ua.beengoo.logdo2.plugin.config.Config;
-import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -17,24 +17,25 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j(topic = "LogDO2")
 public class TimeoutManager {
     private final Plugin plugin;
-    private final LoginStatePort state;
+    private final LoginStateService state;
     private final LoginService service;
     private final Duration loginTtl;
     private final Duration ipTtl;
     private final Duration bedrockReuseWindow;
 
     // Scheduling state
-    private final boolean folia; // true if Folia APIs are available
-    private int legacyTaskId = -1; // Spigot/Paper task id
-    private Object foliaTask = null; // io.papermc.paper.threadedregions.scheduler.ScheduledTask, but kept as Object to avoid hard dep
+    private final boolean folia;
+    private int legacyTaskId = -1;
+    private Object foliaTask = null;
 
     // Throttle for titles
     private final Map<UUID, Long> lastLoginTitle = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastIpTitle = new ConcurrentHashMap<>();
 
-    public TimeoutManager(Plugin plugin, LoginStatePort state, LoginService service,
+    public TimeoutManager(Plugin plugin, LoginStateService state, LoginService service,
                           Duration loginTtl, Duration ipTtl,
                           Duration bedrockReuseWindow) {
         this.plugin = plugin;
@@ -43,21 +44,18 @@ public class TimeoutManager {
         this.loginTtl = loginTtl;
         this.ipTtl = ipTtl;
         this.bedrockReuseWindow = bedrockReuseWindow == null ? Duration.ofSeconds(60) : bedrockReuseWindow;
-        this.folia = detectFolia();
+        this.folia = wasFolia();
     }
 
     public void start() {
-        // 20L delay/period = 1s
         if (folia) {
-            // Folia: run periodic task on Global Region thread
             foliaTask = plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(
                     plugin,
-                    st -> tick(), // DO NOT touch entities/world directly inside tick without re-scheduling to entity
+                    st -> tick(),
                     20L,
                     20L
             );
         } else {
-            // Spigot/Paper legacy scheduler on main thread
             legacyTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this::tick, 20L, 20L);
         }
     }
@@ -65,13 +63,11 @@ public class TimeoutManager {
     public void stop() {
         if (folia) {
             if (foliaTask != null) {
-                // Avoid compile-time Folia import; reflectively cast
                 try {
                     Class<?> cls = Class.forName("io.papermc.paper.threadedregions.scheduler.ScheduledTask");
                     cls.getMethod("cancel").invoke(foliaTask);
-                } catch (Exception ignored) {
-                    // If this fails, there is nothing else to do
-                } finally {
+                } catch (Exception ignored) {}
+                finally {
                     foliaTask = null;
                 }
             }
@@ -87,22 +83,20 @@ public class TimeoutManager {
         final Instant now = Instant.now();
         final long nowSec = now.getEpochSecond();
 
-        // Snapshot pending states once per tick to avoid repeated calls
         final var pendingLogins = state.listPendingLogins();
         final var pendingIps = state.listPendingIpConfirms();
 
-        // First login timeouts + titles
-        for (LoginStatePort.PendingLogin p : pendingLogins) {
+        for (LoginStateService.PendingLogin p : pendingLogins) {
             final UUID uuid = p.uuid();
 
             if (Duration.between(p.at(), now).compareTo(loginTtl) > 0) {
-                runOnPlayerThread(uuid, () -> service.onLoginTimeout(uuid));
+                runOnPlayerThread(uuid, () -> service.handleLoginTimeout(uuid));
             }
 
             Long last = lastLoginTitle.get(uuid);
             if (last == null || nowSec - last >= 5) {
                 runOnPlayerThread(uuid, () -> {
-                            if (!(Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !LogDO2.getInstance().getFloodgateHook().isBedrock(uuid))) {
+                            if (!(Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !LogDO2.getInstance().getFloodgateProvider().isBedrockPlayer(uuid))) {
                                 Action.showLoginPhaseTitle(uuid);
                                 if (p.bedrock()) {
                                     Action.sendBedrockHint(uuid, p.token());
@@ -115,18 +109,17 @@ public class TimeoutManager {
             }
         }
 
-        // IP confirm timeouts + titles
-        for (LoginStatePort.PendingIp p : pendingIps) {
+        for (LoginStateService.PendingIp p : pendingIps) {
             final UUID uuid = p.uuid();
 
             if (Duration.between(p.at(), now).compareTo(ipTtl) > 0) {
-                runOnPlayerThread(uuid, () -> service.onIpConfirmTimeout(uuid));
+                runOnPlayerThread(uuid, () -> service.handleAddressConfirmTimeout(uuid));
             }
 
             Long last = lastIpTitle.get(uuid);
             if (last == null || nowSec - last >= 5) {
                 runOnPlayerThread(uuid, () -> {
-                    if (!(Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !LogDO2.getInstance().getFloodgateHook().isBedrock(uuid))){
+                    if (!(Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !LogDO2.getInstance().getFloodgateProvider().isBedrockPlayer(uuid))){
                         Action.showIpConfirmPhaseTitle(uuid);
                     }
                 });
@@ -134,55 +127,41 @@ public class TimeoutManager {
             }
         }
 
-        // Cleanup stale entries (no longer pending)
-        final Set<UUID> stillPendingLogin = pendingLogins.stream().map(LoginStatePort.PendingLogin::uuid).collect(java.util.stream.Collectors.toSet());
-        final Set<UUID> stillPendingIp = pendingIps.stream().map(LoginStatePort.PendingIp::uuid).collect(java.util.stream.Collectors.toSet());
+        final Set<UUID> stillPendingLogin = pendingLogins.stream().map(LoginStateService.PendingLogin::uuid).collect(java.util.stream.Collectors.toSet());
+        final Set<UUID> stillPendingIp = pendingIps.stream().map(LoginStateService.PendingIp::uuid).collect(java.util.stream.Collectors.toSet());
         lastLoginTitle.keySet().removeIf(uuid -> !stillPendingLogin.contains(uuid));
         lastIpTitle.keySet().removeIf(uuid -> !stillPendingIp.contains(uuid));
 
-        // Clear Bedrock pending login after reuse window if player never returned
-        for (LoginStatePort.PendingLogin p : pendingLogins) {
+        for (LoginStateService.PendingLogin p : pendingLogins) {
             if (!p.bedrock()) continue;
             UUID uuid = p.uuid();
-            // Only consider players who are currently offline
             if (Bukkit.getPlayer(uuid) != null) continue;
-            // If there is no recent code after leave (i.e., leftAt is older than window), clear pending state
             boolean withinWindow = state.recentBedrockCodeAfterLeave(uuid, bedrockReuseWindow).isPresent();
             if (!withinWindow) {
-                // Clear state silently (no kick since player is offline)
                 state.clearPendingLogin(uuid);
             }
         }
     }
 
-    /**
-     * Ensure player-affecting code runs on the correct thread.
-     * On Folia: use EntityScheduler of the Player (if online).
-     * On legacy: we are already on the main thread due to scheduleSyncRepeatingTask.
-     */
     private void runOnPlayerThread(UUID uuid, Runnable action) {
         if (!folia) {
-            // Main thread already
             action.run();
             return;
         }
 
-        // Folia path: re-schedule onto the player's entity thread
         Player player = Bukkit.getPlayer(uuid);
-        if (player == null) return; // Player offline; nothing to do
+        if (player == null) return;
 
-        // player.getScheduler().run(plugin, task -> action.run(), null) — no delay
         player.getScheduler().run(plugin, scheduledTask -> {
             try {
                 action.run();
             } catch (Throwable t) {
-                // Avoid crashing scheduler due to plugin exception
-                plugin.getLogger().warning("TimeoutManager action failed for " + uuid + ": " + t.getMessage());
+                log.warn("TimeoutManager action failed for {}: {}", uuid, t.getMessage());
             }
         }, null);
     }
 
-    private boolean detectFolia() {
+    private boolean wasFolia() {
         try {
             Class.forName("io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler");
             return true;

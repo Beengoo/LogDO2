@@ -1,48 +1,45 @@
 package ua.beengoo.logdo2.core.service;
 
-import lombok.Getter;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.events.*;
-import ua.beengoo.logdo2.api.ports.*;
-import ua.beengoo.logdo2.api.provider.Properties;
-import ua.beengoo.logdo2.api.provider.PropertiesProvider;
+import ua.beengoo.logdo2.api.spi.PlatformBridge;
+import ua.beengoo.logdo2.api.spi.callbacks.LoginCallbacks;
+import ua.beengoo.logdo2.api.spi.repo.*;
+import ua.beengoo.logdo2.api.spi.providers.*;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 public class LoginService {
-    private final OAuthPort oauth;
-    private DiscordDmPort dm;
+    private final OAuthProvider oauth;
+    private DiscordMessagesProvider dm;
     private final AccountsRepo accounts;
     private final ProfileRepo profiles;
     private final TokensRepo tokens;
-    private final LoginStatePort state;
+    private final LoginStateService state;
     private final DiscordUserRepo discordUserRepo;
     private final Logger log;
     private final String publicUrl;
     private final String redirectUri;
-    private final Plugin plugin;
-    private final MessagesPort msg;
-    private IpPolicyPort ipPolicy;
+    private final PlatformBridge platform;
+    private final LoginCallbacks callbacks;
+    private final MessagesProvider msg;
 
     private final PropertiesProvider propertiesProvider;
     private final BanProgressRepo banProgressRepo;
 
-    public LoginService(OAuthPort oauth, DiscordDmPort dm,
+    public LoginService(OAuthProvider oauth, DiscordMessagesProvider dm,
                         AccountsRepo accounts, ProfileRepo profiles, TokensRepo tokens,
-                        LoginStatePort state, Logger log,
-                        String publicUrl, String redirectUri,
-                        DiscordUserRepo discordUserRepo, Plugin plugin,
+                        LoginStateService state, Logger log,
+                        String publicUrl,
+                        DiscordUserRepo discordUserRepo,
                         BanProgressRepo banProgressRepo,
                         PropertiesProvider propertiesProvider,
-                        MessagesPort messages) {
+                        MessagesProvider messages,
+                        PlatformBridge platform,
+                        LoginCallbacks callbacks) {
         this.oauth = oauth;
         this.dm = dm;
         this.accounts = accounts;
@@ -51,20 +48,19 @@ public class LoginService {
         this.state = state;
         this.log = log;
         this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length()-1) : publicUrl;
-        this.redirectUri = redirectUri;
+        this.redirectUri = publicUrl + "/oauth/callback";
         this.discordUserRepo = discordUserRepo;
-        this.plugin = plugin;
         this.msg = messages;
+        this.platform = platform;
+        this.callbacks = callbacks;
 
         this.banProgressRepo = banProgressRepo;
         this.propertiesProvider = propertiesProvider;
     }
 
-    public void setDiscordDmPort(DiscordDmPort dm) { this.dm = dm; }
-    public void setIpPolicyPort(IpPolicyPort ipPolicy) { this.ipPolicy = ipPolicy; }
+    public void setDiscordDmPort(DiscordMessagesProvider dm) { this.dm = dm; }
 
-    // === Join flow ===
-    public void onPlayerJoin(UUID uuid, String name, String currentIp, boolean bedrock) {
+    public void handlePlayerJoin(UUID uuid, String name, String currentIp, boolean bedrock) {
         profiles.upsertName(uuid, name);
         profiles.updatePlatform(uuid, bedrock ? "BEDROCK" : "JAVA");
         Properties props = propertiesProvider.getSnapshot();
@@ -75,10 +71,10 @@ public class LoginService {
                         .orElseGet(() -> state.createOneTimeCode(uuid, currentIp, name));
                 state.recordBedrockCodeShown(uuid, code);
                 state.markPendingLogin(uuid, currentIp, code, true);
-                firePhaseEnter(uuid, LoginPhase.LOGIN, new PlayerLoginPhaseEnterEvent.PlayerLoginData(true, code));
+                firePhaseEnter(uuid, LoginPhase.LOGIN, new LoginCallbacks.PlayerLoginData(true, code));
             } else {
                 String token = state.createOAuthState(uuid, currentIp, name, false);
-                firePhaseEnter(uuid, LoginPhase.LOGIN, new PlayerLoginPhaseEnterEvent.PlayerLoginData(false, token));
+                firePhaseEnter(uuid, LoginPhase.LOGIN, new LoginCallbacks.PlayerLoginData(false, token));
                 state.markPendingLogin(uuid, currentIp, token, false);
             }
             return;
@@ -88,7 +84,7 @@ public class LoginService {
         if (!Objects.equals(last, currentIp)) {
             long discordId = accounts.findDiscordForProfile(uuid).orElseThrow();
             state.markPendingIpConfirm(uuid, currentIp, discordId);
-            if (dm != null) dm.sendIpConfirmDm(discordId, uuid, name, currentIp);
+            if (dm != null) dm.sendLocationConfirmMessage(discordId, uuid, name, currentIp);
             firePhaseEnter(uuid, LoginPhase.IP_CONFIRM, null);
         }
     }
@@ -98,14 +94,7 @@ public class LoginService {
         if (state.isPendingLogin(uuid)) return false;
         if (state.isPendingIpConfirm(uuid)) return false;
         String last = profiles.findLastConfirmedIp(uuid).orElse(null);
-        if (ipPolicy != null && last != null) {
-            try {
-                return ipPolicy.allow(currentIp, last);
-            } catch (Throwable t) {
-                // fallback to strict equality on errors
-                return Objects.equals(last, currentIp);
-            }
-        }
+        // Simple IP policy: must match last confirmed IP
         return Objects.equals(last, currentIp);
     }
 
@@ -119,7 +108,7 @@ public class LoginService {
         return state.createOAuthState(uuid, ip, name, bedrock);
     }
 
-    public void onOAuthCallback(String code, String stateToken) {
+    public void handleWebServerCallback(String code, String stateToken) {
         var st = state.consumeOAuthState(stateToken);
         var tokenSet = oauth.exchangeCode(code, redirectUri);
         var user = oauth.fetchUser(tokenSet.accessToken());
@@ -161,48 +150,41 @@ public class LoginService {
         profiles.updateLastConfirmedIp(st.uuid(), st.ip());
         profiles.updatePlatform(st.uuid(), st.bedrock() ? "BEDROCK" : "JAVA");
 
-        if (dm != null) dm.sendFirstLoginDm(user.id(), st.uuid(), st.name(), publicUrl);
+        if (dm != null) dm.sendGreetingsMessage(user.id(), st.uuid(), st.name(), publicUrl);
         state.clearPendingLogin(st.uuid());
 
         firePhaseExit(st.uuid(), LoginPhase.LOGIN, LoginExitReason.LOGIN_SUCCESS);
     }
 
-    public void onDiscordIpConfirm(UUID profileUuid, long discordUserId) {
+    public void acceptNewAddress(UUID profileUuid, long discordUserId) {
         Optional<Long> owner = accounts.findDiscordForProfile(profileUuid);
         if (owner.isEmpty() || owner.get() != discordUserId) {
-            log.warning("IP confirm by non-owner. profile=" + profileUuid + " by " + discordUserId);
+            log.warning("Canceled accept attempt on profile that has no record. (another bot instance is running?) profile=" + profileUuid + " by " + discordUserId);
             return;
         }
         var pending = state.consumePendingIpConfirm(profileUuid);
         if (pending == null) return;
 
         profiles.updateLastConfirmedIp(profileUuid, pending.newIp());
-        // Fire Bukkit event for integrations (main thread, only if player online)
-        runPlayer(profileUuid, p -> {
-            try {
-                Bukkit.getPluginManager()
-                        .callEvent(new PlayerIpConfirmedEvent(p, pending.newIp()));
-            } catch (Throwable ignored) {}
-        });
+        callbacks.onIpConfirmed(profileUuid, pending.newIp());
         firePhaseExit(profileUuid, LoginPhase.IP_CONFIRM, LoginExitReason.IP_CONFIRM_CONFIRMED);
     }
 
-    public void onDiscordIpReject(UUID profileUuid, long discordUserId) {
+    public void rejectNewAddress(UUID profileUuid, long discordUserId) {
         Optional<Long> owner = accounts.findDiscordForProfile(profileUuid);
         if (owner.isEmpty() || owner.get() != discordUserId) {
-            log.warning("IP reject by non-owner. profile=" + profileUuid + " by " + discordUserId);
+            log.warning("Canceled rejection attempt on profile that has no record. (another bot instance is running?) profile=" + profileUuid + " by " + discordUserId);
             return;
         }
 
         firePhaseExit(profileUuid, LoginPhase.IP_CONFIRM, LoginExitReason.IP_CONFIRM_REJECT);
     }
 
-    public boolean onDiscordSlashLogin(String code, long discordUserId) {
+    public boolean handleBedrockLoginCommand(String code, long discordUserId) {
         var pending = state.consumeOneTimeCode(code);
         if (pending == null) return false;
         Properties props = propertiesProvider.getSnapshot();
 
-        // Enforce Bedrock per-Discord limit before reserve
         boolean bypass = state.hasLimitBypass(pending.uuid());
         if (!bypass) {
             int limit = props.bedrockLimitPerDiscord;
@@ -219,81 +201,26 @@ public class LoginService {
 
         String token = state.createOAuthState(pending.uuid(), pending.ip(), pending.name(), true);
         String loginUrl = publicUrl + "/login?state=" + token;
-        if (dm != null) dm.sendFinalizeOAuthLink(discordUserId, loginUrl);
+        if (dm != null) dm.sendOAuth2URLMessage(discordUserId, loginUrl);
 
         return true;
     }
 
-    public void onLoginTimeout(UUID uuid) {
+    public void handleLoginTimeout(UUID uuid) {
         state.clearPendingLogin(uuid);
-        //kick(uuid, msg.mc("timeouts.login_kick"));
         firePhaseExit(uuid, LoginPhase.LOGIN, LoginExitReason.LOGIN_TIMEOUT);
     }
 
-    public void onIpConfirmTimeout(UUID uuid) {
+    public void handleAddressConfirmTimeout(UUID uuid) {
         state.consumePendingIpConfirm(uuid);
         firePhaseExit(uuid, LoginPhase.IP_CONFIRM, LoginExitReason.IP_CONFIRM_TIMEOUT);
     }
 
-    // === Components & main-thread helpers ===
-
-    public Optional<String> disallowReasonOnLogin(UUID uuid) {
-        Properties props = propertiesProvider.getSnapshot();
-        if (!props.disallowSimultaneousPlay) return Optional.empty();
-        var owner = accounts.findDiscordForProfile(uuid);
-        if (owner.isEmpty()) return Optional.empty();
-        long discordId = owner.get();
-        for (org.bukkit.entity.Player other : org.bukkit.Bukkit.getOnlinePlayers()) {
-            if (other.getUniqueId().equals(uuid)) continue;
-            var otherOwner = accounts.findDiscordForProfile(other.getUniqueId());
-            if (otherOwner.isPresent() && otherOwner.get() == discordId) {
-                Map<String, String> ph = Map.of("other", other.getName());
-                return Optional.of(msg.mc("limits.simultaneous_kick", ph));
-            }
-        }
-        return Optional.empty();
-    }
-
-    private void firePhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginPhaseEnterEvent.PlayerLoginData data) {
-        runPlayer(uuid, p -> {
-            try {
-                Bukkit.getPluginManager()
-                        .callEvent(new PlayerLoginPhaseEnterEvent(p, phase, data));
-            } catch (Throwable ignored) {}
-        });
+    private void firePhaseEnter(UUID uuid, LoginPhase phase, LoginCallbacks.PlayerLoginData data) {
+        callbacks.onPhaseEnter(uuid, phase, data);
     }
 
     private void firePhaseExit(UUID uuid, LoginPhase phase, LoginExitReason cause) {
-        runPlayer(uuid, p -> {
-            try {
-                Bukkit.getPluginManager()
-                        .callEvent(new PlayerLoginPhaseExitEvent(p, phase, cause));
-            } catch (Throwable ignored) {}
-        });
-    }
-
-    private void runPlayer(UUID uuid, Consumer<Player> action) {
-        if (Bukkit.isPrimaryThread()) {
-            Player p = Bukkit.getPlayer(uuid);
-            if (p != null) action.accept(p);
-            return;
-        }
-        try {
-            Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null) {
-                    try {
-                        p.getScheduler().execute(plugin, () -> action.accept(p), null, 0L);
-                    } catch (Throwable ignored) {
-                        action.accept(p);
-                    }
-                }
-            });
-        } catch (Throwable ignored) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null) action.accept(p);
-            });
-        }
+        callbacks.onPhaseExit(uuid, phase, cause);
     }
 }

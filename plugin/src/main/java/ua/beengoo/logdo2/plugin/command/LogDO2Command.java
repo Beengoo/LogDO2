@@ -15,8 +15,13 @@ import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import ua.beengoo.logdo2.api.LogDO2Api;
+import ua.beengoo.logdo2.api.entity.LinkInfo;
+import ua.beengoo.logdo2.api.entity.LogDO2Profile;
 import ua.beengoo.logdo2.api.events.LogDO2ReloadEvent;
-import ua.beengoo.logdo2.api.ports.*;
+import ua.beengoo.logdo2.api.spi.repo.*;
+import ua.beengoo.logdo2.api.spi.providers.MessagesProvider;
+import ua.beengoo.logdo2.core.service.LoginStateService;
 import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
@@ -29,25 +34,28 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
+@Slf4j(topic = "LogDO2")
 public class LogDO2Command implements CommandExecutor, TabCompleter {
     private static final DateTimeFormatter LOOKUP_DT = DateTimeFormatter.ofPattern("dd-MM-yy hh:mm a", Locale.ENGLISH);
     private static final List<String> SUBS = List.of("help", "lookup", "link", "logout", "forgive", "bypass", "reload");
     private static final MiniMessage MINI = MiniMessage.miniMessage();
+    private final LogDO2Api api;
     private final AccountsRepo accountsRepo;
     private final ProfileRepo profileRepo;
     private final BanProgressRepo banProgressRepo;
     private final DiscordUserRepo discordUserRepo;
-    private final MessagesPort msg;
+    private final MessagesProvider msg;
     private final AuditLogger audit;
     private final JDA jda;
 
-    public LogDO2Command(AccountsRepo accountsRepo,
+    public LogDO2Command(LogDO2Api api,
+                         AccountsRepo accountsRepo,
                          ProfileRepo profileRepo,
                          BanProgressRepo banProgressRepo,
                          DiscordUserRepo discordUserRepo,
-                         MessagesPort msg,
+                         MessagesProvider msg,
                          AuditLogger audit, JDA jda) {
+        this.api = api;
         this.accountsRepo = accountsRepo;
         this.profileRepo = profileRepo;
         this.banProgressRepo = banProgressRepo;
@@ -101,48 +109,61 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
         String target = args[1];
 
-        // what we will fill
-        UUID resolvedUuid = null;
-        Long resolvedDiscord = null;
-        String resolvedName = null;
+        // Resolve input and get profile
+        LogDO2Profile profile;
+        UUID resolvedUuid;
+        Long resolvedDiscord;
+        String resolvedName;
 
-        // auxiliary results to show at the end
-        List<UUID> profilesForDiscord = Collections.emptyList();
-        Optional<Long> discordForProfile = Optional.empty();
-
-        // ---- Decide what input is (only set variables / collect ids) ----
+        // ---- Decide what input is and fetch profile ----
         if (isNumeric(target)) {
             // treat as discord id
             resolvedDiscord = Long.parseLong(target);
-            profilesForDiscord = new ArrayList<>(accountsRepo.findProfilesForDiscord(resolvedDiscord));
-            // If there are profiles, pick first to show primary name/uuid
-            if (!profilesForDiscord.isEmpty()) {
-                UUID first = profilesForDiscord.getFirst();
-                resolvedName = profileRepo.findNameByUuid(first).orElse(null);
-                resolvedUuid = first;
-                discordForProfile = accountsRepo.findAnyDiscordForProfile(first);
+            profile = api.getProfile(resolvedDiscord);
+            // If profile exists, extract primary UUID and name
+            if (profile != null && !profile.getLinkInfo().isEmpty()) {
+                LinkInfo primary = profile.getLinkInfo().stream()
+                        .filter(LinkInfo::isPrimary)
+                        .findFirst()
+                        .orElseGet(() -> profile.getLinkInfo().get(0));
+                resolvedUuid = primary.getMinecraftProfile().getUuid();
+                resolvedName = primary.getMinecraftProfile().getName();
+            } else {
+                resolvedUuid = null;
+                resolvedName = null;
             }
         } else if (isUuid(target)) {
             // treat as UUID
             resolvedUuid = UUID.fromString(target);
-            resolvedName = profileRepo.findNameByUuid(resolvedUuid).orElse(null);
-            discordForProfile = accountsRepo.findAnyDiscordForProfile(resolvedUuid);
-
-            // if profile has a discord, collect all profiles for that discord
-            if (discordForProfile.isPresent()) {
-                resolvedDiscord = discordForProfile.get();
-                profilesForDiscord = new ArrayList<>(accountsRepo.findProfilesForDiscord(resolvedDiscord));
+            profile = api.getProfile(resolvedUuid);
+            if (profile != null) {
+                resolvedDiscord = profile.getDiscordProfile().getOAuthInfo().getDiscordId();
+                // Find name for this specific UUID
+                UUID finalResolvedUuid = resolvedUuid;
+                resolvedName = profile.getLinkInfo().stream()
+                        .filter(link -> link.getMinecraftProfile().getUuid().equals(finalResolvedUuid))
+                        .findFirst()
+                        .map(link -> link.getMinecraftProfile().getName())
+                        .orElse(null);
+            } else {
+                resolvedDiscord = null;
+                resolvedName = null;
             }
         } else {
-            // treat as player name — do not send messages here, just resolve
-            resolvedUuid = resolveUuid(target); // may be null
+            // treat as player name
+            resolvedUuid = resolveUuid(target);
             if (resolvedUuid != null) {
                 resolvedName = target;
-                discordForProfile = accountsRepo.findAnyDiscordForProfile(resolvedUuid);
-                if (discordForProfile.isPresent()) {
-                    resolvedDiscord = discordForProfile.get();
-                    profilesForDiscord = new ArrayList<>(accountsRepo.findProfilesForDiscord(resolvedDiscord));
+                profile = api.getProfile(resolvedUuid);
+                if (profile != null) {
+                    resolvedDiscord = profile.getDiscordProfile().getOAuthInfo().getDiscordId();
+                } else {
+                    resolvedDiscord = null;
                 }
+            } else {
+                profile = null;
+                resolvedDiscord = null;
+                resolvedName = null;
             }
         }
 
@@ -155,9 +176,9 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
         outComponents.add(Component.text("=== Lookup Result ===").color(NamedTextColor.GOLD));
         outComponents.add(Component.text("Query: ").append(Component.text(target).color(NamedTextColor.WHITE)));
-
-        // If detected Discord id
-        if (resolvedDiscord != null) {
+        outComponents.add(buildLabeledCopyComponent("Profile ID: ", String.valueOf(profile.getProfileId())));
+        // If detected Discord id and profile exists
+        if (resolvedDiscord != null && profile != null) {
             outPlain.append("Discord ID: ").append(resolvedDiscord).append("\n");
             outComponents.add(buildLabeledCopyComponent("Discord ID: ", String.valueOf(resolvedDiscord)));
 
@@ -169,19 +190,23 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
                         .append(buildInlineCopyComponent("%s".formatted(maskEmail(maybeEmail.get(), 1, 1, '❤')), maybeEmail.get())));
             }
 
-            if (profilesForDiscord.isEmpty()) {
+            List<LinkInfo> linkedProfiles = profile.getLinkInfo();
+            if (linkedProfiles.isEmpty()) {
                 outPlain.append("  No profiles linked to this Discord.\n");
                 outComponents.add(Component.text("  No profiles linked to this Discord.").color(NamedTextColor.GRAY));
             } else {
                 outPlain.append("Linked profiles:\n");
                 outComponents.add(Component.text("Linked profiles:").color(NamedTextColor.GRAY));
-                for (UUID u : profilesForDiscord) {
-                    String name = profileRepo.findNameByUuid(u).orElse("<unknown>");
+                for (LinkInfo linkInfo : linkedProfiles) {
+                    UUID u = linkInfo.getMinecraftProfile().getUuid();
+                    String name = linkInfo.getMinecraftProfile().getName();
+                    String platform = linkInfo.getMinecraftProfile().getPlatform();
+
                     outPlain.append(" - ").append(name).append(" (").append(u).append(")\n");
 
                     // component: clickable line with name + uuid
                     Component line = Component.text(" - ")
-                            .append(Component.text(profileRepo.findPlatform(u).orElse("<unknown>")).color(NamedTextColor.DARK_GREEN))
+                            .append(Component.text(platform != null ? platform : "<unknown>").color(NamedTextColor.DARK_GREEN))
                             .append(Component.space())
                             .append(Component.text(name).color(NamedTextColor.YELLOW))
                             .append(Component.space())
@@ -213,21 +238,14 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         if (resolvedName != null) {
             outPlain.append("Primary name: ").append(resolvedName).append("\n");
             outComponents.add(Component.text("Primary name: ").color(NamedTextColor.GRAY).append(Component.text(resolvedName).color(NamedTextColor.WHITE)));
-        } else if (resolvedUuid != null) {
-            String maybeName = profileRepo.findNameByUuid(resolvedUuid).orElse(null);
-            if (maybeName != null) {
-                outPlain.append("Primary name: ").append(maybeName).append("\n");
-                outComponents.add(Component.text("Primary name: ").color(NamedTextColor.GRAY).append(Component.text(maybeName).color(NamedTextColor.WHITE)));
-            }
         }
 
         // Linked discord for profile
-        Optional<Long> finalDiscord = discordForProfile;
-        if (finalDiscord.isPresent()) {
-            outPlain.append("Linked Discord ID: ").append(finalDiscord.get()).append("\n");
+        if (resolvedDiscord != null) {
+            outPlain.append("Linked Discord ID: ").append(resolvedDiscord).append("\n");
             outComponents.add(Component.text("Linked Discord info:").color(NamedTextColor.GRAY));
             // fetch extra member info (string for console)
-            String memberInfo = fetchMember(finalDiscord.get());
+            String memberInfo = fetchMember(resolvedDiscord);
             outPlain.append(memberInfo);
             // for player: append simplified lines
             outComponents.add(Component.text(memberInfo).color(NamedTextColor.RED));
@@ -267,7 +285,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         // sanitize keep values
         keepStart = Math.max(0, keepStart);
         keepEnd = Math.max(0, keepEnd);
-        if (keepStart + keepEnd >= local.length()) return local + domain; // нічого маскувати
+        if (keepStart + keepEnd >= local.length()) return local + domain;
 
         StringBuilder sb = new StringBuilder();
         sb.append(local, 0, Math.min(keepStart, local.length()));
@@ -311,7 +329,12 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
                 out.append("Unable to find configured Discord guild.\n");
                 return out.toString();
             }
-            Member dMember = guild.retrieveMemberById(resolvedDiscord).complete();
+            Member dMember = null;
+            try {
+                dMember = guild.retrieveMemberById(resolvedDiscord).complete();
+            } catch (Exception e) {
+                log.warn("Unable to fetch user with id {} (not in guild anymore?)", resolvedDiscord);
+            }
             if (dMember != null) {
                 out.append(" Name: ").append(dMember.getEffectiveName()).append("\n");
                 // account creation and join times: convert to ZonedDateTime and format
@@ -352,7 +375,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         }
 
         // Mark one-time bypass in login state
-        ua.beengoo.logdo2.api.ports.LoginStatePort st = getLoginState();
+        LoginStateService st = getLoginState();
         if (st == null) {
             sender.sendMessage("§cInternal error: login state not available.");
             return;
@@ -365,8 +388,8 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         ));
     }
 
-    private ua.beengoo.logdo2.api.ports.LoginStatePort getLoginState() {
-        return org.bukkit.Bukkit.getServicesManager().load(ua.beengoo.logdo2.api.ports.LoginStatePort.class);
+    private LoginStateService getLoginState() {
+        return org.bukkit.Bukkit.getServicesManager().load(LoginStateService.class);
     }
 
     private void handleLink(CommandSender sender, String[] args) {

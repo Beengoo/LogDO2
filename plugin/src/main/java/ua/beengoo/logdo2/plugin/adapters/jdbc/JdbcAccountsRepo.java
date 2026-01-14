@@ -1,6 +1,7 @@
 package ua.beengoo.logdo2.plugin.adapters.jdbc;
 
-import ua.beengoo.logdo2.api.ports.AccountsRepo;
+import ua.beengoo.logdo2.api.entity.ProfileIdGenerator;
+import ua.beengoo.logdo2.api.spi.repo.AccountsRepo;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
 
 import javax.sql.DataSource;
@@ -26,7 +27,6 @@ public class JdbcAccountsRepo implements AccountsRepo {
                 ps.setString(1, profileUuid.toString());
                 ps.executeUpdate();
             }
-            // Also remove profile record to fully clear association state
             try (PreparedStatement ps2 = c.prepareStatement("DELETE FROM mc_profiles WHERE mc_uuid=?")) {
                 ps2.setString(1, profileUuid.toString());
                 ps2.executeUpdate();
@@ -61,7 +61,6 @@ public class JdbcAccountsRepo implements AccountsRepo {
 
     @Override
     public void link(long discordId, UUID profileUuid) {
-        // For backward compatibility: perform full activation
         reserve(discordId, profileUuid);
         activate(discordId, profileUuid);
     }
@@ -81,28 +80,33 @@ public class JdbcAccountsRepo implements AccountsRepo {
                 }
                 ps.executeUpdate();
             }
-            // ensure discord_account exists
+            // ensure discord_account exists with created_at and profile_id
+            String profileId = ProfileIdGenerator.generate(discordId, now);
             try (PreparedStatement ps = upsertAccountSql(c)) {
                 ps.setLong(1, discordId);
                 ps.setString(2, null);
                 ps.setString(3, null);
                 ps.setString(4, null);
                 ps.setString(5, null);
-                ps.setLong(6, now);
+                ps.setLong(6, now); // created_at
+                ps.setLong(7, now); // updated_at
+                ps.setString(8, profileId);
                 if (dialect == DatabaseManager.Dialect.MYSQL) {
-                    ps.setString(7, null);
-                    ps.setString(8, null);
                     ps.setString(9, null);
                     ps.setString(10, null);
-                    ps.setLong(11, now);
+                    ps.setString(11, null);
+                    ps.setString(12, null);
+                    ps.setLong(13, now); // created_at
+                    ps.setLong(14, now); // updated_at
+                    ps.setString(15, profileId);
                 }
                 ps.executeUpdate();
             }
-            // link (reserve: active=0)
+            // link (reserve: active=0, is_primary=0)
             String sql = switch (dialect) {
-                case POSTGRES, SQLITE -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,0,?) " +
+                case POSTGRES, SQLITE -> "INSERT INTO links(discord_id, mc_uuid, active, is_primary, created_at) VALUES(?,?,0,0,?) " +
                         "ON CONFLICT(discord_id, mc_uuid) DO UPDATE SET active=0";
-                case MYSQL -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,0,?) " +
+                case MYSQL -> "INSERT INTO links(discord_id, mc_uuid, active, is_primary, created_at) VALUES(?,?,0,0,?) " +
                         "ON DUPLICATE KEY UPDATE active=VALUES(active)";
             };
             try (PreparedStatement ps = c.prepareStatement(sql)) {
@@ -126,17 +130,31 @@ public class JdbcAccountsRepo implements AccountsRepo {
                 ps.setLong(2, discordId);
                 ps.executeUpdate();
             }
+
+            // Check if user already has a primary link
+            boolean hasPrimary = false;
+            try (PreparedStatement ps = c.prepareStatement("SELECT 1 FROM links WHERE discord_id=? AND is_primary=1 LIMIT 1")) {
+                ps.setLong(1, discordId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    hasPrimary = rs.next();
+                }
+            }
+
+            // Set is_primary=1 if this is the first active link for this discord_id
+            int isPrimary = hasPrimary ? 0 : 1;
+
             // Upsert this pair as active=1
             String sql = switch (dialect) {
-                case POSTGRES, SQLITE -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,1,?) " +
-                        "ON CONFLICT(discord_id, mc_uuid) DO UPDATE SET active=1";
-                case MYSQL -> "INSERT INTO links(discord_id, mc_uuid, active, created_at) VALUES(?,?,1,?) " +
-                        "ON DUPLICATE KEY UPDATE active=VALUES(active)";
+                case POSTGRES, SQLITE -> "INSERT INTO links(discord_id, mc_uuid, active, is_primary, created_at) VALUES(?,?,1,?,?) " +
+                        "ON CONFLICT(discord_id, mc_uuid) DO UPDATE SET active=1, is_primary=EXCLUDED.is_primary";
+                case MYSQL -> "INSERT INTO links(discord_id, mc_uuid, active, is_primary, created_at) VALUES(?,?,1,?,?) " +
+                        "ON DUPLICATE KEY UPDATE active=VALUES(active), is_primary=VALUES(is_primary)";
             };
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 ps.setLong(1, discordId);
                 ps.setString(2, profileUuid.toString());
-                ps.setLong(3, now);
+                ps.setInt(3, isPrimary);
+                ps.setLong(4, now);
                 ps.executeUpdate();
             }
         } catch (Exception e) {
@@ -177,14 +195,14 @@ public class JdbcAccountsRepo implements AccountsRepo {
     private PreparedStatement upsertAccountSql(Connection c) throws Exception {
         return switch (dialect) {
             case POSTGRES, SQLITE -> c.prepareStatement(
-                    "INSERT INTO discord_accounts(discord_id,username,global_name,email,avatar_hash,updated_at) VALUES(?,?,?,?,?,?) " +
+                    "INSERT INTO discord_accounts(discord_id,username,global_name,email,avatar_hash,created_at,updated_at,profile_id) VALUES(?,?,?,?,?,?,?,?) " +
                             "ON CONFLICT(discord_id) DO UPDATE SET username=COALESCE(EXCLUDED.username, discord_accounts.username)," +
                             "global_name=COALESCE(EXCLUDED.global_name, discord_accounts.global_name)," +
                             "email=COALESCE(EXCLUDED.email, discord_accounts.email)," +
                             "avatar_hash=COALESCE(EXCLUDED.avatar_hash, discord_accounts.avatar_hash)," +
                             "updated_at=EXCLUDED.updated_at");
             case MYSQL -> c.prepareStatement(
-                    "INSERT INTO discord_accounts(discord_id,username,global_name,email,avatar_hash,updated_at) VALUES(?,?,?,?,?,?) " +
+                    "INSERT INTO discord_accounts(discord_id,username,global_name,email,avatar_hash,created_at,updated_at,profile_id) VALUES(?,?,?,?,?,?,?,?) " +
                             "ON DUPLICATE KEY UPDATE username=VALUES(username), global_name=VALUES(global_name), email=VALUES(email)," +
                             "avatar_hash=VALUES(avatar_hash), updated_at=VALUES(updated_at)");
         };
@@ -252,5 +270,82 @@ public class JdbcAccountsRepo implements AccountsRepo {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public boolean isPrimaryLink(long discordId, UUID profileUuid) {
+        String sql = "SELECT is_primary FROM links WHERE discord_id=? AND mc_uuid=? AND active=1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            ps.setString(2, profileUuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("is_primary") == 1;
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return false;
+    }
+
+    @Override
+    public Optional<UUID> findPrimaryProfileForDiscord(long discordId) {
+        String sql = "SELECT mc_uuid FROM links WHERE discord_id=? AND active=1 AND is_primary=1 LIMIT 1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(UUID.fromString(rs.getString("mc_uuid")));
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public void setPrimaryLink(long discordId, UUID profileUuid) {
+        try (Connection c = ds.getConnection()) {
+            // Unset all other primary flags for this discord_id
+            try (PreparedStatement ps = c.prepareStatement("UPDATE links SET is_primary=0 WHERE discord_id=?")) {
+                ps.setLong(1, discordId);
+                ps.executeUpdate();
+            }
+            // Set this link as primary
+            try (PreparedStatement ps = c.prepareStatement("UPDATE links SET is_primary=1 WHERE discord_id=? AND mc_uuid=? AND active=1")) {
+                ps.setLong(1, discordId);
+                ps.setString(2, profileUuid.toString());
+                int updated = ps.executeUpdate();
+                if (updated == 0) {
+                    throw new IllegalStateException("Cannot set primary on non-existent or inactive link");
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Map<UUID, Boolean> findLinksWithPrimaryFlag(long discordId) {
+        Map<UUID, Boolean> result = new HashMap<>();
+        String sql = "SELECT mc_uuid, is_primary FROM links WHERE discord_id=? AND active=1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    UUID uuid = UUID.fromString(rs.getString("mc_uuid"));
+                    boolean isPrimary = rs.getInt("is_primary") == 1;
+                    result.put(uuid, isPrimary);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return result;
     }
 }

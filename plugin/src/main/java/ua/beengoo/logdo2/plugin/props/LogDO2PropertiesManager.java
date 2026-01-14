@@ -1,15 +1,17 @@
 package ua.beengoo.logdo2.plugin.props;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.plugin.java.JavaPlugin;
-import ua.beengoo.logdo2.api.provider.Properties;
-import ua.beengoo.logdo2.api.provider.PropertiesProvider;
+import ua.beengoo.logdo2.api.spi.providers.Properties;
+import ua.beengoo.logdo2.api.spi.providers.PropertiesProvider;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+@Slf4j(topic = "LogDO2")
 public class LogDO2PropertiesManager implements PropertiesProvider {
     @Getter
     private static final LogDO2PropertiesManager INSTANCE = new LogDO2PropertiesManager();
@@ -61,10 +63,10 @@ public class LogDO2PropertiesManager implements PropertiesProvider {
             for (var l : listeners) {
                 try { l.accept(newProps); } catch (Exception ignored) {}
             }
-            plugin.getLogger().info("ConfigManager: reloaded config snapshot");
+            log.info("Applying configuration");
             return true;
         } catch (Exception e) {
-            plugin.getLogger().severe("ConfigManager: reload failed: " + e.getMessage());
+            log.error("Failed to load configuration", e);
             return false;
         }
     }

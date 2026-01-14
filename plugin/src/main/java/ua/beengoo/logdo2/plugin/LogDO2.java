@@ -3,6 +3,11 @@ package ua.beengoo.logdo2.plugin;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -14,40 +19,45 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.api.LogDO2Api;
-import ua.beengoo.logdo2.api.ports.*;
+import ua.beengoo.logdo2.api.spi.PlatformBridge;
+import ua.beengoo.logdo2.api.spi.callbacks.LoginCallbacks;
+import ua.beengoo.logdo2.api.spi.repo.*;
+import ua.beengoo.logdo2.api.spi.providers.*;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.LoginStateService;
 import ua.beengoo.logdo2.plugin.adapters.discord.JdaDiscordDmAdapter;
 import ua.beengoo.logdo2.plugin.adapters.jdbc.*;
 import ua.beengoo.logdo2.plugin.adapters.oauth.DiscordOAuthAdapter;
+import ua.beengoo.logdo2.plugin.adapters.platform.BukkitLoginCallbacks;
+import ua.beengoo.logdo2.plugin.adapters.platform.BukkitPlatformBridge;
 import ua.beengoo.logdo2.plugin.command.LogDO2Command;
 import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
-import ua.beengoo.logdo2.plugin.discord.JdaDiscordButtonListener;
-import ua.beengoo.logdo2.plugin.discord.JdaSlashLoginListener;
+import ua.beengoo.logdo2.plugin.discord.JDAButtonInteractionListener;
+import ua.beengoo.logdo2.plugin.discord.JDALoginCommandListener;
 import ua.beengoo.logdo2.plugin.discord.SlashCommandRegistrar;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.listeners.LogDO2Listener;
 import ua.beengoo.logdo2.plugin.listeners.game.PlayerListener;
-import ua.beengoo.logdo2.plugin.listeners.game.PreLoginListener;
-import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
+import ua.beengoo.logdo2.api.spi.providers.FloodgateProvider;
+import ua.beengoo.logdo2.plugin.adapters.floodgate.FloodgateAdapter;
 import ua.beengoo.logdo2.plugin.listeners.ReloadListener;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
 import ua.beengoo.logdo2.plugin.runtime.TimeoutManager;
 import ua.beengoo.logdo2.plugin.util.EncryptionManager;
 import ua.beengoo.logdo2.plugin.util.EnumsUtil;
 import ua.beengoo.logdo2.plugin.util.StringUtil;
-import ua.beengoo.logdo2.plugin.web.LoginEndpoint;
+import ua.beengoo.logdo2.plugin.web.HttpLoginServer;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
-import ua.beengoo.logdo2.plugin.adapters.api.AccountsReadAdapter;
 import ua.beengoo.logdo2.plugin.adapters.api.LogDO2ApiImpl;
-import ua.beengoo.logdo2.plugin.adapters.api.ProfileReadAdapter;
+import ua.beengoo.logdo2.plugin.conditions.login.LoginConditionEvaluator;
+import ua.beengoo.logdo2.plugin.conditions.login.LogDO2LoginConditionsProvider;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
-@Slf4j
+@Slf4j(topic = "LogDO2")
 public final class LogDO2 extends JavaPlugin {
 
     @Getter
@@ -56,16 +66,16 @@ public final class LogDO2 extends JavaPlugin {
     @Getter
     private JDA jda;
     @Getter
-    private LoginEndpoint loginEndpoint;
+    private HttpLoginServer httpLoginServer;
     private TimeoutManager timeouts;
     private AuditLogger audit;
 
     @Getter
     private LoginService loginService;
     @Getter
-    private OAuthPort oauthPort;
+    private OAuthProvider authProvider;
     @Getter
-    private DiscordDmPort discordDmPort;
+    private DiscordMessagesProvider discordMessageProvider;
     @Getter
     private AccountsRepo accountsRepo;
     @Getter
@@ -79,18 +89,21 @@ public final class LogDO2 extends JavaPlugin {
     @Getter
     private BanProgressRepo banProgressRepo;
     @Getter
-    private LoginStatePort loginStatePort;
+    private LoginStateService loginStatePort;
 
     @Getter
-    private FloodgateHook floodgateHook;
+    private FloodgateProvider floodgateProvider;
 
     private DatabaseManager db;
     @Getter
     private LogDO2ApiImpl logdo2API;
+    @Getter
+    private LoginConditionEvaluator conditionEvaluator;
 
     @Override
     public void onEnable() {
         instance = this;
+        configureLogging();
         Config.init(this);
         saveDefaultConfig();
         Config.updateConfigDefaults();
@@ -118,7 +131,7 @@ public final class LogDO2 extends JavaPlugin {
 
         String keyB64 = getConfig().getString("security.tokenEncryptionKeyBase64", "");
         if (keyB64.isBlank()) {
-            log.error("security.tokenEncryptionKeyBase64 is missing in config.yml");
+            log.error("security.tokenEncryptionKeyBase64 is missing! Please generate and set one in plugins/LogDO2/config.yml");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -131,35 +144,53 @@ public final class LogDO2 extends JavaPlugin {
         this.banProgressRepo = new JdbcBanProgressRepo(db.dataSource(), db.dialect());
         this.loginStatePort  = new LoginStateService(LogDO2PropertiesManager.getINSTANCE());
 
-        String redirectUri = publicUrl + "/oauth/callback";
-        this.oauthPort = getServer().getServicesManager().load(OAuthPort.class);
-        if (this.oauthPort == null) {
-            this.oauthPort = new DiscordOAuthAdapter(getLogger(), clientId, clientSecret, scopes);
+        this.conditionEvaluator = new LoginConditionEvaluator(
+            this, accountsRepo, messages
+        );
+
+        LogDO2LoginConditionsProvider builtinConditions = new LogDO2LoginConditionsProvider(
+            banProgressRepo, accountsRepo,
+            LogDO2PropertiesManager.getINSTANCE(), messages
+        );
+        getServer().getServicesManager().register(
+            LoginConditionProvider.class,
+            builtinConditions,
+            this,
+            ServicePriority.Normal
+        );
+        conditionEvaluator.rebuildConditionCache();
+        this.authProvider = getServer().getServicesManager().load(OAuthProvider.class);
+        if (this.authProvider == null) {
+            this.authProvider = new DiscordOAuthAdapter(clientId, clientSecret, scopes);
         } else {
-            log.info("Using external OAuthPort provider.");
+            log.info("Using external authentication provider");
         }
 
+        PlatformBridge platformBridge = new BukkitPlatformBridge(this);
+        LoginCallbacks loginCallbacks = new BukkitLoginCallbacks(this);
+
         this.loginService = new LoginService(
-                oauthPort, null,
+                authProvider, null,
                 accountsRepo, profileRepo, tokensRepo, loginStatePort, getLogger(),
-                publicUrl, redirectUri,
+                publicUrl,
                 discordUserRepo,
-                this,
                 banProgressRepo,
                 LogDO2PropertiesManager.getINSTANCE(),
-                messages
+                messages,
+                platformBridge,
+                loginCallbacks
         );
 
         startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
 
-        DiscordDmPort externalDm = getServer().getServicesManager().load(DiscordDmPort.class);
-        if (externalDm != null) {
-            this.discordDmPort = externalDm;
-            this.loginService.setDiscordDmPort(discordDmPort);
-            log.info("Using external DM provider.");
+        DiscordMessagesProvider externalMP = getServer().getServicesManager().load(DiscordMessagesProvider.class);
+        if (externalMP != null) {
+            this.discordMessageProvider = externalMP;
+            this.loginService.setDiscordDmPort(discordMessageProvider);
+            log.info("Using external message provider");
         } else {
-            this.discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages);
-            this.loginService.setDiscordDmPort(discordDmPort);
+            this.discordMessageProvider = new JdaDiscordDmAdapter(jda, messages);
+            this.loginService.setDiscordDmPort(discordMessageProvider);
         }
 
         boolean auditEnabled = getConfig().getBoolean("audit.enabled", true);
@@ -180,26 +211,25 @@ public final class LogDO2 extends JavaPlugin {
         String targetGuildId = getConfig().getString("discord.targetGuildId", "");
         String inviteChannelId = getConfig().getString("discord.inviteChannelId", "");
 
-        this.loginEndpoint = new LoginEndpoint(
-                getLogger(), loginService,
+        this.httpLoginServer = new HttpLoginServer(
+                loginService,
                 jda,
                 postAction, postText, redirectUrlCfg,
                 targetGuildId, inviteChannelId,
                 audit
         );
-        this.loginEndpoint.start(webPort);
+        this.httpLoginServer.start(webPort);
 
-        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, loginStatePort, jda, targetGuildId);
+        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, tokensRepo, discordUserRepo, loginStatePort, jda, targetGuildId);
 
-        LogDO2Command cmd = new LogDO2Command(accountsRepo, profileRepo, banProgressRepo, discordUserRepo, messages, audit, jda);
+        LogDO2Command cmd = new LogDO2Command(logdo2API, accountsRepo, profileRepo, banProgressRepo, discordUserRepo, messages, audit, jda);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
         Objects.requireNonNull(getCommand("logdo2")).setTabCompleter(cmd);
 
-        this.floodgateHook = new FloodgateHook();
-        if (this.floodgateHook.isPresent()) log.info("Floodgate is supported!");
+        this.floodgateProvider = new FloodgateAdapter();
+        if (this.floodgateProvider.isAvailable()) log.info("Found Floodgate!");
         Bukkit.getPluginManager().registerEvents(new LogDO2Listener(), this);
-        Bukkit.getPluginManager().registerEvents(new PreLoginListener(banProgressRepo, getLogger(), messages, audit), this);
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, this.floodgateHook, loginStatePort, this, audit), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(loginService, this.floodgateProvider, loginStatePort, this, audit, conditionEvaluator), this);
         Bukkit.getPluginManager().registerEvents(new ReloadListener(this), this);
         this.timeouts = new TimeoutManager(
                 this, loginStatePort, loginService,
@@ -209,19 +239,11 @@ public final class LogDO2 extends JavaPlugin {
         );
         this.timeouts.start();
 
-        IpPolicyPort ipPolicy = getServer().getServicesManager().load(IpPolicyPort.class);
-        if (ipPolicy != null) {
-            loginService.setIpPolicyPort(ipPolicy);
-            log.info("External IP Policy in use.");
-        }
-
         var sm = getServer().getServicesManager();
-        sm.register(ProfileReadPort.class, new ProfileReadAdapter(profileRepo), this, ServicePriority.Normal);
-        sm.register(AccountsReadPort.class, new AccountsReadAdapter(accountsRepo), this, ServicePriority.Normal);
         sm.register(LogDO2Api.class, this.logdo2API, this, ServicePriority.Normal);
-        sm.register(LoginStatePort.class, loginStatePort, this, ServicePriority.Normal);
+        sm.register(LoginStateService.class, loginStatePort, this, ServicePriority.Normal);
 
-        log.info("Using SQL dialect: {}", db.dialect());
+        log.info("Database in use: {}", db.dialect());
         log.info("LogDO2 is ready!");
     }
     public void startJDA(String botToken, List<String> intentNames,
@@ -232,16 +254,14 @@ public final class LogDO2 extends JavaPlugin {
                         EnumsUtil.parseEnums(GatewayIntent.class, intentNames)
                 )
                 .addEventListeners(
-                        new JdaSlashLoginListener(loginService, getLogger(), messages, audit),
-                        new JdaDiscordButtonListener(loginService, profileRepo, messages, getLogger(), audit),
+                        new JDALoginCommandListener(loginService, messages, audit),
+                        new JDAButtonInteractionListener(loginService, profileRepo, messages, audit),
                         new ListenerAdapter() {
                             @Override public void onReady(@NotNull ReadyEvent event) {
                                 SlashCommandRegistrar.register(jda);
-                                if (discordDmPort == null) {
-                                    discordDmPort = new JdaDiscordDmAdapter(jda, getLogger(), messages);
-                                    loginService.setDiscordDmPort(discordDmPort);
-                                } else {
-                                    log.info("External DM adapter used.");
+                                if (discordMessageProvider == null) {
+                                    discordMessageProvider = new JdaDiscordDmAdapter(jda, messages);
+                                    loginService.setDiscordDmPort(discordMessageProvider);
                                 }
                             }
                         }
@@ -257,7 +277,15 @@ public final class LogDO2 extends JavaPlugin {
     }
 
     private void shutdownJDA(){
-        if (jda != null) jda.shutdown();
+        if (jda != null) {
+            try {
+                log.info("Waiting 5 seconds for JDA to shutdown");
+                jda.awaitShutdown(Duration.ofSeconds(5));
+            } catch (Exception e) {
+                log.warn("JDA shutdown was interrupted or timed out!");
+            }
+
+        }
     }
 
     public void restartJDA(String botToken, List<String> intentNames,
@@ -269,10 +297,54 @@ public final class LogDO2 extends JavaPlugin {
         startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
     }
 
+    private void configureLogging() {
+        try {
+            LoggerContext context = (LoggerContext) LogManager.getContext(false);
+            Configuration config = context.getConfiguration();
+
+            // Mute JDA info logs
+            LoggerConfig jdaLogger = config.getLoggerConfig("net.dv8tion.jda");
+            if (jdaLogger.getLevel().isMoreSpecificThan(Level.WARN)) {
+                jdaLogger.setLevel(Level.WARN);
+            } else {
+                config.addLogger("net.dv8tion.jda", new LoggerConfig("net.dv8tion.jda", Level.WARN, true));
+            }
+
+            // Mute Javalin info logs
+            LoggerConfig javalinLogger = config.getLoggerConfig("io.javalin");
+            if (javalinLogger.getLevel().isMoreSpecificThan(Level.WARN)) {
+                javalinLogger.setLevel(Level.WARN);
+            } else {
+                config.addLogger("io.javalin", new LoggerConfig("io.javalin", Level.WARN, true));
+            }
+
+            // Mute Jetty info logs (used by Javalin)
+            LoggerConfig jettyLogger = config.getLoggerConfig("org.eclipse.jetty");
+            if (jettyLogger.getLevel().isMoreSpecificThan(Level.WARN)) {
+                jettyLogger.setLevel(Level.WARN);
+            } else {
+                config.addLogger("org.eclipse.jetty", new LoggerConfig("org.eclipse.jetty", Level.WARN, true));
+            }
+
+            // Mute Hikari info logs
+            LoggerConfig hikariLogger = config.getLoggerConfig("com.zaxxer.hikari");
+            if (hikariLogger.getLevel().isMoreSpecificThan(Level.WARN)) {
+                hikariLogger.setLevel(Level.WARN);
+            } else {
+                config.addLogger("com.zaxxer.hikari", new LoggerConfig("com.zaxxer.hikari", Level.WARN, true));
+            }
+
+            context.updateLoggers();
+            log.debug("Logging configuration applied: JDA, Javalin, and Jetty set to WARN level");
+        } catch (Exception e) {
+            log.warn("Failed to configure logging levels: {}", e.getMessage());
+        }
+    }
+
     @Override
     public void onDisable() {
         if (timeouts != null) timeouts.stop();
-        if (loginEndpoint != null) loginEndpoint.stop();
+        if (httpLoginServer != null) httpLoginServer.stop();
         if (db != null) db.stop();
         shutdownJDA();
         if (audit != null) try { audit.close(); } catch (Exception ignored) {}

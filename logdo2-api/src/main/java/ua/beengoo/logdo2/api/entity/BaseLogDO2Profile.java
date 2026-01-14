@@ -20,7 +20,7 @@ public interface BaseLogDO2Profile {
      */
     LogDO2ProfileStatus getProfileStatus();
 
-
+    long getCreatedAt();
     /**
      * @return List of profile links
      */

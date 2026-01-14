@@ -1,6 +1,6 @@
 package ua.beengoo.logdo2.plugin.adapters.jdbc;
 
-import ua.beengoo.logdo2.api.ports.ProfileRepo;
+import ua.beengoo.logdo2.api.spi.repo.ProfileRepo;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
 
 import javax.sql.DataSource;
@@ -28,7 +28,7 @@ public class JdbcProfileRepo implements ProfileRepo {
         };
         try (Connection c = ds.getConnection(); var st = c.createStatement()) {
             st.execute(alter);
-        } catch (Exception ignored) { /* вже існує — ок */ }
+        } catch (Exception ignored) {}
     }
 
     @Override

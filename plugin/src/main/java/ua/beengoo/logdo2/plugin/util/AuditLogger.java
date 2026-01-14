@@ -19,7 +19,7 @@ public class AuditLogger implements Closeable {
     private static final DateTimeFormatter TS = DateTimeFormatter.ISO_INSTANT.withZone(ZoneOffset.UTC);
 
     public AuditLogger(Plugin plugin, String filename) throws IOException {
-        File pluginsDir = plugin.getDataFolder().getParentFile(); // .../plugins
+        File pluginsDir = plugin.getDataFolder().getParentFile();
         File root = (pluginsDir != null && pluginsDir.getParentFile() != null)
                 ? pluginsDir.getParentFile()
                 : new File(".").getCanonicalFile();
@@ -53,7 +53,6 @@ public class AuditLogger implements Closeable {
 
     private static String safe(String s) {
         if (s == null) return "";
-        // Strip newlines and tabs
         return s.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
     }
 

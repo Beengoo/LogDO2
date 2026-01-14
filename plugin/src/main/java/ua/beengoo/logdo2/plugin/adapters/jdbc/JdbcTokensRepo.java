@@ -1,6 +1,6 @@
 package ua.beengoo.logdo2.plugin.adapters.jdbc;
 
-import ua.beengoo.logdo2.api.ports.TokensRepo;
+import ua.beengoo.logdo2.api.spi.repo.TokensRepo;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
 import ua.beengoo.logdo2.plugin.util.EncryptionManager;
 
@@ -64,12 +64,12 @@ public class JdbcTokensRepo implements TokensRepo {
             ps.setLong(1, discordId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
-                String access = new String(crypto.decrypt(rs.getBytes(1)), StandardCharsets.UTF_8);
-                String refresh= new String(crypto.decrypt(rs.getBytes(2)), StandardCharsets.UTF_8);
-                String ttype  = rs.getString(3);
-                String scope  = rs.getString(4);
-                Instant exp   = Instant.ofEpochSecond(rs.getLong(5));
-                return Optional.of(new TokenView(access, refresh, exp, ttype, scope));
+                String access       = new String(crypto.decrypt(rs.getBytes(1)), StandardCharsets.UTF_8);
+                String refresh      = new String(crypto.decrypt(rs.getBytes(2)), StandardCharsets.UTF_8);
+                String tokenType    = rs.getString(3);
+                String scope        = rs.getString(4);
+                Instant exp         = Instant.ofEpochSecond(rs.getLong(5));
+                return Optional.of(new TokenView(access, refresh, exp, tokenType, scope));
             }
         } catch (Exception e) { throw new RuntimeException(e); }
     }

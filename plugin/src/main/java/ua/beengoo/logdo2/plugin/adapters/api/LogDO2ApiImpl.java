@@ -2,25 +2,25 @@ package ua.beengoo.logdo2.plugin.adapters.api;
 
 import lombok.Setter;
 import net.dv8tion.jda.api.JDA;
-import org.bukkit.OfflinePlayer;
-import ua.beengoo.logdo2.api.DiscordAccount;
 import ua.beengoo.logdo2.api.LogDO2Api;
-import ua.beengoo.logdo2.api.MinecraftProfile;
-import ua.beengoo.logdo2.api.SessionView;
 import ua.beengoo.logdo2.api.entity.LogDO2Profile;
-import ua.beengoo.logdo2.api.ports.AccountsRepo;
-import ua.beengoo.logdo2.api.ports.LoginStatePort;
-import ua.beengoo.logdo2.api.ports.ProfileRepo;
+import ua.beengoo.logdo2.api.entity.LogDO2ProfileFactory;
+import ua.beengoo.logdo2.api.spi.repo.AccountsRepo;
+import ua.beengoo.logdo2.api.spi.repo.DiscordUserRepo;
+import ua.beengoo.logdo2.api.spi.repo.ProfileRepo;
+import ua.beengoo.logdo2.api.spi.repo.TokensRepo;
 import ua.beengoo.logdo2.core.service.LoginService;
+import ua.beengoo.logdo2.core.service.LoginStateService;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 public class LogDO2ApiImpl implements LogDO2Api {
     private final LoginService service;
     private final ProfileRepo profiles;
     private final AccountsRepo accounts;
-    private final LoginStatePort loginState;
+    private final TokensRepo tokens;
+    private final DiscordUserRepo discordUsers;
+    private final LoginStateService loginState;
     @Setter
     private JDA discordBot;
     private final String targetGuildId;
@@ -28,12 +28,16 @@ public class LogDO2ApiImpl implements LogDO2Api {
     public LogDO2ApiImpl(LoginService service,
                          ProfileRepo profiles,
                          AccountsRepo accounts,
-                         LoginStatePort loginState,
+                         TokensRepo tokens,
+                         DiscordUserRepo discordUsers,
+                         LoginStateService loginState,
                          JDA discordBot,
                          String targetGuildId) {
         this.service = service;
         this.profiles = profiles;
         this.accounts = accounts;
+        this.tokens = tokens;
+        this.discordUsers = discordUsers;
         this.loginState = loginState;
         this.discordBot = discordBot;
         this.targetGuildId = targetGuildId;
@@ -41,18 +45,12 @@ public class LogDO2ApiImpl implements LogDO2Api {
 
     @Override
     public LogDO2Profile getProfile(Long discordId) {
-
-        return null;
+        return LogDO2ProfileFactory.fromDiscordId(discordId, accounts, profiles, tokens, discordUsers).orElse(null);
     }
 
     @Override
     public LogDO2Profile getProfile(UUID minecraftUUID) {
-        return null;
-    }
-
-    @Override
-    public LogDO2Profile getProfile(OfflinePlayer player) {
-        return null;
+        return LogDO2ProfileFactory.fromMinecraftUuid(minecraftUUID, accounts, profiles, tokens, discordUsers).orElse(null);
     }
 
     @Override
@@ -61,77 +59,12 @@ public class LogDO2ApiImpl implements LogDO2Api {
     }
 
     @Override
-    public Optional<Long> discordId(UUID uuid) {
-        return accounts.findDiscordForProfile(uuid);
-    }
-
-    @Override
-    public Set<UUID> getProfiles(Long discordId) {
-        return accounts.findProfilesForDiscord(discordId);
-    }
-
-    @Override
-    public Optional<String> lastConfirmedIp(UUID uuid) {
-        return profiles.findLastConfirmedIp(uuid);
-    }
-
-    @Override
     public boolean isActionAllowed(UUID uuid, String currentIp) {
         return service.isActionAllowed(uuid, currentIp);
     }
 
     @Override
-    public DiscordAccount getDiscordAccount(long discordId) {
-        // keep order: accounts.findProfilesForDiscord returns a Set
-        List<DiscordAccount.MinecraftProfileSummary> summaries = accounts.findProfilesForDiscord(discordId).stream()
-                .map(uuid -> {
-                    String name = profiles.findNameByUuid(uuid).orElse(null);
-                    MinecraftProfile.MinecraftPlatform platform = profiles.findPlatform(uuid)
-                            .map(MinecraftProfile.MinecraftPlatform::fromDatabase)
-                            .orElse(MinecraftProfile.MinecraftPlatform.UNKNOWN);
-                    boolean primary = accounts.findDiscordForProfile(uuid).map(d -> d == discordId).orElse(false);
-                    return new DiscordAccount.MinecraftProfileSummary(uuid, name, platform, primary);
-                })
-                .collect(Collectors.toList());
-        return new DiscordAccount(discordId, summaries);
-    }
-
-    @Override
-    public MinecraftProfile getMinecraftProfile(UUID uuid) {
-        String name = profiles.findNameByUuid(uuid).orElse(null);
-        MinecraftProfile.MinecraftPlatform platform = profiles.findPlatform(uuid)
-                .map(MinecraftProfile.MinecraftPlatform::fromDatabase)
-                .orElse(MinecraftProfile.MinecraftPlatform.UNKNOWN);
-        String lastIp = profiles.findLastConfirmedIp(uuid).orElse(null);
-        Optional<Long> linkedDiscord = accounts.findDiscordForProfile(uuid);
-        return new MinecraftProfile(uuid, name, platform, lastIp, linkedDiscord);
-    }
-
-    public SessionView getSessionForProfile(UUID uuid) {
-        Optional<SessionView.PendingLoginView> pendingLogin = loginState.listPendingLogins().stream()
-                .filter(pl -> pl.uuid().equals(uuid))
-                .findFirst()
-                .map(pl -> new SessionView.PendingLoginView(pl.ip(), pl.bedrock(), pl.at()));
-
-        Optional<SessionView.PendingIpConfirmView> pendingIp = loginState.listPendingIpConfirms().stream()
-                .filter(pi -> pi.uuid().equals(uuid))
-                .findFirst()
-                .map(pi -> new SessionView.PendingIpConfirmView(pi.newIp(), pi.discordId(), pi.at()));
-
-        boolean bypass = loginState.hasLimitBypass(uuid);
-        return new SessionView(pendingLogin, pendingIp, bypass);
-    }
-
-    public List<MinecraftProfile> getUsersByDiscord(long discordId) {
-        List<MinecraftProfile> list = new ArrayList<>();
-        for (UUID uuid : accounts.findProfilesForDiscord(discordId)) {
-            list.add(getMinecraftProfile(uuid));
-        }
-        return List.copyOf(list);
-    }
-
-    @Override
-    public JDA getDiscordBot() {
+    public Object getDiscordBot() {
         return discordBot;
     }
 

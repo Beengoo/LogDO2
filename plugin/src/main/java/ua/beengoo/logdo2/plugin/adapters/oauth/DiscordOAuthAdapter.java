@@ -2,8 +2,9 @@ package ua.beengoo.logdo2.plugin.adapters.oauth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
-import ua.beengoo.logdo2.api.ports.OAuthPort;
+import ua.beengoo.logdo2.api.spi.providers.OAuthProvider;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -13,19 +14,17 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
-import java.util.logging.Logger;
 
-public class DiscordOAuthAdapter implements OAuthPort {
+@Slf4j(topic = "LogDO2")
+public class DiscordOAuthAdapter implements OAuthProvider {
     private static final MediaType FORM = MediaType.parse("application/x-www-form-urlencoded");
-    private final Logger log;
     private final OkHttpClient http = new OkHttpClient();
     private final ObjectMapper om = new ObjectMapper();
     private final String clientId;
     private final String clientSecret;
     private final String scopesCfg; //"identify email applications.commands"
 
-    public DiscordOAuthAdapter(Logger log, String clientId, String clientSecret, String scopes) {
-        this.log = log;
+    public DiscordOAuthAdapter(String clientId, String clientSecret, String scopes) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.scopesCfg = scopes == null ? "identify email applications.commands" : scopes;
@@ -68,7 +67,7 @@ public class DiscordOAuthAdapter implements OAuthPort {
             String scope    = json.has("scope") ? json.get("scope").asText() : normalizeScopes(scopesCfg);
             return new TokenSet(access, refresh, Instant.now().plusSeconds(expiresIn), tokenTyp, scope);
         } catch (IOException e) {
-            log.warning("OAuth exchange error: " + e.getMessage());
+            log.warn("OAuth exchange error: {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -92,7 +91,7 @@ public class DiscordOAuthAdapter implements OAuthPort {
             String avatar   = j.hasNonNull("avatar") ? j.get("avatar").asText() : null;
             return new DiscordUser(id, username, global, email, avatar);
         } catch (IOException e) {
-            log.warning("OAuth fetchUser error: " + e.getMessage());
+            log.warn("OAuth fetchUser error: {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }

@@ -6,7 +6,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
 
-@Slf4j
+@Slf4j(topic = "LogDO2")
 public class Config {
     @Getter
     private static FileConfiguration fileConfiguration;

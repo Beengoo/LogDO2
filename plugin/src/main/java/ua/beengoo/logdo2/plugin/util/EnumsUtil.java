@@ -8,7 +8,7 @@ import java.util.Locale;
 import java.util.Set;
 
 
-@Slf4j
+@Slf4j(topic = "LogDO2")
 public class EnumsUtil {
     private EnumsUtil() {}
 

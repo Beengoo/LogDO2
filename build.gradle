@@ -20,6 +20,14 @@ subprojects {
             name = "papermc-repo"
             url = "https://repo.papermc.io/repository/maven-public/"
         }
+        maven {
+            name = "opencollab-snapshots"
+            url = "https://repo.opencollab.dev/maven-snapshots/"
+        }
+        maven {
+            name = "opencollab-releases"
+            url = "https://repo.opencollab.dev/maven-releases/"
+        }
     }
 
     dependencies {

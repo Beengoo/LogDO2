@@ -19,6 +19,11 @@ login:
     # Bedrock connections are not supported MINI color formats in chat (but somehow support in on titles...)
     code_hint: "Go to our official discord server, find our bot, open dm and run /login {code} command."
   linked_actionbar: "<green>Welcome!</green>"
+  conditions:
+    denied_single: "<red>{reason}</red>"
+    denied_multi: |
+      <red>Login denied:</red>
+      {reasons}
 
 ip:
   unconfirmed:

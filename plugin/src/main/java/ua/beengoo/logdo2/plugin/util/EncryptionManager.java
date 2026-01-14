@@ -1,6 +1,6 @@
 package ua.beengoo.logdo2.plugin.util;
 
-import ua.beengoo.logdo2.api.security.EncryptionProvider;
+import ua.beengoo.logdo2.api.spi.providers.EncryptionProvider;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -17,7 +17,7 @@ public record EncryptionManager(SecretKey key) implements EncryptionProvider {
 
     public static EncryptionManager fromBase64(String base64) {
         byte[] raw = Base64.getDecoder().decode(base64);
-        if (raw.length != 32) throw new IllegalArgumentException("tokenEncryptionKeyBase64 must be 32 bytes");
+        if (raw.length != 32) throw new IllegalArgumentException("tokenEncryptionKeyBase64 must be 32 bytes!");
         return new EncryptionManager(new SecretKeySpec(raw, "AES"));
     }
 
@@ -38,7 +38,7 @@ public record EncryptionManager(SecretKey key) implements EncryptionProvider {
     }
 
     public byte[] decrypt(byte[] blob) {
-        if (blob.length <= IV_LEN) throw new IllegalArgumentException("bad blob");
+        if (blob.length <= IV_LEN) throw new IllegalArgumentException("bad blob provided");
         byte[] iv = new byte[IV_LEN];
         System.arraycopy(blob, 0, iv, 0, IV_LEN);
         byte[] enc = new byte[blob.length - IV_LEN];

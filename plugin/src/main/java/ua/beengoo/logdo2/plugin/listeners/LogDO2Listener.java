@@ -2,6 +2,7 @@ package ua.beengoo.logdo2.plugin.listeners;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent;
 import ua.beengoo.logdo2.api.events.PlayerLoginPhaseEnterEvent;
 import ua.beengoo.logdo2.api.events.PlayerLoginPhaseExitEvent;
 import ua.beengoo.logdo2.plugin.LogDO2;
@@ -50,12 +51,10 @@ public class LogDO2Listener implements Listener {
                         LogDO2.getInstance().getMessages().mc("login.linked_actionbar")
                 );
             }
-            case LOGIN_TIMEOUT -> {
-                Action.kick(
-                        event.getPlayer().getUniqueId(),
-                        LogDO2.getInstance().getMessages().mc("timeouts.login_kick")
-                );
-            }
+            case LOGIN_TIMEOUT -> Action.kick(
+                    event.getPlayer().getUniqueId(),
+                    LogDO2.getInstance().getMessages().mc("timeouts.login_kick")
+            );
             case IP_CONFIRM_TIMEOUT -> {
                 Action.kick(
                         event.getPlayer().getUniqueId(),

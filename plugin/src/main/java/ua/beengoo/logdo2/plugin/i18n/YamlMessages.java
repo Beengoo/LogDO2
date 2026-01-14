@@ -5,7 +5,7 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
-import ua.beengoo.logdo2.api.ports.MessagesPort;
+import ua.beengoo.logdo2.api.spi.providers.MessagesProvider;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,8 +13,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-@Slf4j
-public class YamlMessages implements MessagesPort {
+@Slf4j(topic = "LogDO2")
+public class YamlMessages implements MessagesProvider {
     private final Plugin plugin;
     private final File file;
     private FileConfiguration cfg;
@@ -44,7 +44,7 @@ public class YamlMessages implements MessagesPort {
                 defaults.loadFromString(text);
             }
         } catch (IOException | InvalidConfigurationException e) {
-            plugin.getLogger().warning("Failed to load default messages: " + e.getMessage());
+            log.warn("Failed to load default messages: {}", e.getMessage());
         }
         cfg = YamlConfiguration.loadConfiguration(file);
         if (defaults != null) {

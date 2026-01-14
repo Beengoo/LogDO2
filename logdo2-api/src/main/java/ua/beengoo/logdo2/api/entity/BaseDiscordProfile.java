@@ -5,7 +5,7 @@ public interface BaseDiscordProfile {
 
 
     /**
-     * @return true if authorized by user itself, not manually added
+     * @return true if authenticated by user itself, not manually added
      */
-    boolean isUserAuthorized();
+    boolean isUserAuthenticated();
 }

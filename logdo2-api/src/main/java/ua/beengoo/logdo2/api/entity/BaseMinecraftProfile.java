@@ -1,12 +1,25 @@
 package ua.beengoo.logdo2.api.entity;
 
-import org.bukkit.OfflinePlayer;
+import java.util.UUID;
 
 public interface BaseMinecraftProfile {
-    OfflinePlayer getPlayer();
+    /**
+     * @return The player's UUID
+     */
+    UUID getUuid();
 
     /**
-     * @return Last validated player IP address.
+     * @return The player's name
+     */
+    String getName();
+
+    /**
+     * @return The player's platform (JAVA or BEDROCK)
+     */
+    String getPlatform();
+
+    /**
+     * @return Last validated player IP address
      */
     String getLastValidIp();
 }

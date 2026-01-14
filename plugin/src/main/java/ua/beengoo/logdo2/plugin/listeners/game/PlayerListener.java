@@ -12,11 +12,11 @@ import org.bukkit.plugin.Plugin;
 import ua.beengoo.logdo2.api.events.LoginPhase;
 import ua.beengoo.logdo2.api.events.PlayerIpCheckEvent;
 import ua.beengoo.logdo2.api.events.PlayerPostLoginCheckEvent;
-import ua.beengoo.logdo2.api.ports.LoginStatePort;
 import ua.beengoo.logdo2.core.service.LoginService;
-import ua.beengoo.logdo2.plugin.actions.Action;
+import ua.beengoo.logdo2.core.service.LoginStateService;
+import ua.beengoo.logdo2.plugin.conditions.login.LoginConditionEvaluator;
 import ua.beengoo.logdo2.plugin.config.Config;
-import ua.beengoo.logdo2.plugin.integration.FloodgateHook;
+import ua.beengoo.logdo2.api.spi.providers.FloodgateProvider;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.net.InetAddress;
@@ -27,22 +27,24 @@ import java.util.function.Consumer;
 
 public class PlayerListener implements Listener {
     private final LoginService loginService;
-    private final FloodgateHook floodgate;
-    private final LoginStatePort state;
+    private final FloodgateProvider floodgateProvider;
+    private final LoginStateService state;
     private final Plugin plugin;
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private final AuditLogger audit;
     private final java.util.Map<java.util.UUID, Phase> lastPhase = new java.util.concurrent.ConcurrentHashMap<>();
+    private final LoginConditionEvaluator conditionEvaluator;
 
-    public PlayerListener(LoginService loginService, FloodgateHook floodgate, LoginStatePort state, Plugin plugin, AuditLogger audit) {
+    public PlayerListener(LoginService loginService, FloodgateProvider floodgateProvider, LoginStateService state, Plugin plugin, AuditLogger audit, LoginConditionEvaluator conditionEvaluator) {
         this.loginService = loginService;
-        this.floodgate = floodgate;
+        this.floodgateProvider = floodgateProvider;
         this.state = state;
         this.plugin = plugin;
         this.audit = audit;
+        this.conditionEvaluator = conditionEvaluator;
     }
 
-    // === ENTRY POINT ===
+    @SuppressWarnings("deprecation")
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onLogin(PlayerLoginEvent e) {
         Player p = e.getPlayer();
@@ -54,7 +56,7 @@ public class PlayerListener implements Listener {
                 "ip", ip,
                 "bedrock", String.valueOf(bedrock)
         ));
-        var reasonOpt = loginService.disallowReasonOnLogin(p.getUniqueId());
+        var reasonOpt = conditionEvaluator.evaluateConditions(p.getUniqueId(), p.getName(), ip, bedrock);
         boolean allowed = reasonOpt.isEmpty();
         try {
             runPlayer(e.getPlayer().getUniqueId(), player -> Bukkit.getPluginManager().callEvent(
@@ -68,7 +70,7 @@ public class PlayerListener implements Listener {
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         String ip = getIp(p);
-        loginService.onPlayerJoin(p.getUniqueId(), p.getName(), ip, isBedrock(p));
+        loginService.handlePlayerJoin(p.getUniqueId(), p.getName(), ip, isBedrock(p));
         // Apply visuals for current phase if any
         refreshVisuals(p);
         if (audit != null) audit.log("minecraft", "player_join", java.util.Map.of(
@@ -280,11 +282,7 @@ public class PlayerListener implements Listener {
     }
 
     private boolean isBedrock(Player p) {
-        try {
-            return floodgate != null && floodgate.isPresent() && floodgate.isBedrock(p.getUniqueId());
-        } catch (Throwable ignored) {
-            return false;
-        }
+        return floodgateProvider != null && floodgateProvider.isBedrockPlayer(p.getUniqueId());
     }
 
     // ===== visuals (blindness, hide players) =====

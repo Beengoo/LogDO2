@@ -1,9 +1,8 @@
 package ua.beengoo.logdo2.core.service;
 
 import ua.beengoo.logdo2.api.events.LoginPhase;
-import ua.beengoo.logdo2.api.ports.LoginStatePort;
-import ua.beengoo.logdo2.api.provider.PropertiesProvider;
-import ua.beengoo.logdo2.api.provider.Properties;
+import ua.beengoo.logdo2.api.spi.providers.PropertiesProvider;
+import ua.beengoo.logdo2.api.spi.providers.Properties;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -11,7 +10,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class LoginStateService implements LoginStatePort {
+public class LoginStateService {
     private static final Duration OAUTH_STATE_TTL = Duration.ofMinutes(10);
     private static final Duration CODE_TTL        = Duration.ofMinutes(10);
 
@@ -29,14 +28,12 @@ public class LoginStateService implements LoginStatePort {
         this.propertiesProvider = propertiesProvider;
     }
 
-    @Override
     public String createOAuthState(UUID uuid, String ip, String name, boolean bedrock) {
         String token = generateStateToken();
         oauthStates.put(token, new OAuthState(uuid, ip, name, bedrock, Instant.now()));
         return token;
     }
 
-    @Override
     public OAuthState consumeOAuthState(String token) {
         pruneStates();
         var st = oauthStates.remove(token);
@@ -44,20 +41,17 @@ public class LoginStateService implements LoginStatePort {
         return st;
     }
 
-    @Override
     public boolean hasOAuthState(String token) {
         pruneStates();
         return oauthStates.containsKey(token);
     }
 
-    @Override
     public LoginPhase getLoginPhase(UUID uuid) {
         if (pendingIp.containsKey(uuid)) return LoginPhase.IP_CONFIRM;
         if (pendingLogin.containsKey(uuid)) return LoginPhase.LOGIN;
         return null;
     }
 
-    @Override
     public String createOneTimeCode(UUID uuid, String ip, String name) {
         String code;
         do {
@@ -68,7 +62,6 @@ public class LoginStateService implements LoginStatePort {
         return code;
     }
 
-    @Override
     public PendingCode consumeOneTimeCode(String code) {
         pruneCodes();
         PendingCode pc = codes.get(code);
@@ -90,58 +83,47 @@ public class LoginStateService implements LoginStatePort {
         return codes.remove(code);
     }
 
-    @Override
     public void markPendingIpConfirm(UUID uuid, String newIp, long discordId) {
         pendingIp.put(uuid, new PendingIp(uuid, newIp, discordId, Instant.now()));
     }
 
-    @Override
     public boolean isPendingIpConfirm(UUID uuid) {
         return pendingIp.containsKey(uuid);
     }
 
-    @Override
     public PendingIp consumePendingIpConfirm(UUID uuid) {
         return pendingIp.remove(uuid);
     }
 
-    @Override
     public Collection<PendingIp> listPendingIpConfirms() {
         return Collections.unmodifiableCollection(pendingIp.values());
     }
 
-    @Override
     public void markPendingLogin(UUID uuid, String ip, String token, boolean bedrock) {
         pendingLogin.put(uuid, new PendingLogin(uuid, ip, bedrock, token, Instant.now()));
     }
 
-    @Override
     public boolean isPendingLogin(UUID uuid) {
         return pendingLogin.containsKey(uuid);
     }
 
-    @Override
     public void clearPendingLogin(UUID uuid) {
         pendingLogin.remove(uuid);
         bedrockShown.remove(uuid);
     }
 
-    @Override
     public Collection<PendingLogin> listPendingLogins() {
         return Collections.unmodifiableCollection(pendingLogin.values());
     }
 
-    @Override
     public void recordBedrockCodeShown(UUID uuid, String code) {
         bedrockShown.compute(uuid, (u, prev) -> new BedrockShown(code, Instant.now(), prev == null ? null : prev.leftAt()));
     }
 
-    @Override
     public void recordBedrockLeave(UUID uuid) {
         bedrockShown.compute(uuid, (u, prev) -> new BedrockShown(prev == null ? null : prev.code(), prev == null ? null : prev.shownAt(), Instant.now()));
     }
 
-    @Override
     public Optional<String> recentBedrockCodeAfterLeave(UUID uuid, Duration maxAge) {
         var info = bedrockShown.get(uuid);
         if (info == null || info.code() == null || info.leftAt() == null) return Optional.empty();
@@ -150,18 +132,15 @@ public class LoginStateService implements LoginStatePort {
     }
 
     // ===== admin: limit bypass =====
-    @Override
     public void grantLimitBypass(UUID uuid) {
         if (uuid != null) limitBypass.add(uuid);
     }
 
-    @Override
     public boolean hasLimitBypass(UUID uuid) {
         if (uuid == null) return false;
         return limitBypass.contains(uuid);
     }
 
-    @Override
     public boolean consumeLimitBypass(UUID uuid) {
         if (uuid == null) return false;
         return limitBypass.remove(uuid);
@@ -193,5 +172,10 @@ public class LoginStateService implements LoginStatePort {
         return sb.toString();
     }
 
+    // Record types for state management
+    public record OAuthState(UUID uuid, String ip, String name, boolean bedrock, Instant at) {}
+    public record PendingCode(String code, UUID uuid, String ip, String name, Instant at) {}
+    public record PendingLogin(UUID uuid, String ip, boolean bedrock, String token, Instant at) {}
+    public record PendingIp(UUID uuid, String newIp, long discordId, Instant at) {}
     private record BedrockShown(String code, Instant shownAt, Instant leftAt) {}
 }

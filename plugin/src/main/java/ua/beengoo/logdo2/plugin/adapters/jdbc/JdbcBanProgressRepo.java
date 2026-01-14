@@ -1,6 +1,6 @@
 package ua.beengoo.logdo2.plugin.adapters.jdbc;
 
-import ua.beengoo.logdo2.api.ports.BanProgressRepo;
+import ua.beengoo.logdo2.api.spi.repo.BanProgressRepo;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
 
 import javax.sql.DataSource;
@@ -75,7 +75,6 @@ public class JdbcBanProgressRepo implements BanProgressRepo {
             ps.setLong(4, lastBanUntilEpochSec);
             ps.executeUpdate();
         } catch (SQLException e) {
-            // Fallback для MySQL
             String mysql = """
                 INSERT INTO ban_progress(ip, attempts, last_attempt, last_ban_until)
                 VALUES(?,?,?,?)

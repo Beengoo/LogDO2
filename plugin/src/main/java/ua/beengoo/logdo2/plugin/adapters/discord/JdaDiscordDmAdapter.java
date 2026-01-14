@@ -1,32 +1,32 @@
 package ua.beengoo.logdo2.plugin.adapters.discord;
 
+import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import ua.beengoo.logdo2.api.ports.DiscordDmPort;
-import ua.beengoo.logdo2.api.ports.MessagesPort;
+import net.dv8tion.jda.api.components.buttons.Button;
+import ua.beengoo.logdo2.api.spi.providers.DiscordMessagesProvider;
+import ua.beengoo.logdo2.api.spi.providers.MessagesProvider;
 
 import java.awt.*;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.logging.Logger;
 
-public class JdaDiscordDmAdapter implements DiscordDmPort {
+@Slf4j(topic = "LogDO2")
+public class JdaDiscordDmAdapter implements DiscordMessagesProvider {
     private final JDA jda;
-    private final Logger log;
-    private final MessagesPort msg;
+    private final MessagesProvider msg;
 
-    public JdaDiscordDmAdapter(JDA jda, Logger log, MessagesPort msg) {
+    public JdaDiscordDmAdapter(JDA jda, MessagesProvider msg) {
         this.jda = jda;
-        this.log = log;
         this.msg = msg;
     }
 
     @Override
-    public void sendFirstLoginDm(long discordId, UUID mcUuid, String playerName, String publicUrl) {
+    public void sendGreetingsMessage(long discordId, UUID mcUuid, String playerName, String publicUrl) {
         jda.retrieveUserById(discordId).queue(user -> {
-            String title = msg.raw("discord.ip_confirm_title"); // або додай окремий discord.first_login_title
+            String title = msg.raw("discord.ip_confirm_title");
             String body  = msg.raw("discord.first_login_dm")
                     .replace("{name}", playerName)
                     .replace("{uuid}", mcUuid.toString());
@@ -38,11 +38,11 @@ public class JdaDiscordDmAdapter implements DiscordDmPort {
                     .setTimestamp(Instant.now());
 
             openDmAndSendEmbed(user, eb);
-        }, ex -> log.warning("[LogDO2] retrieveUserById failed (firstLogin): " + ex.getMessage()));
+        }, ex -> log.warn("Unable to retrieve user", ex));
     }
 
     @Override
-    public void sendIpConfirmDm(long discordId, UUID mcUuid, String playerName, String newIp) {
+    public void sendLocationConfirmMessage(long discordId, UUID mcUuid, String playerName, String newIp) {
         jda.retrieveUserById(discordId).queue(user -> {
             String title = msg.raw("discord.ip_confirm_title");
             String body  = msg.raw("discord.ip_confirm_body")
@@ -60,40 +60,41 @@ public class JdaDiscordDmAdapter implements DiscordDmPort {
             String cidReject = "ip:reject:" + mcUuid;
 
             user.openPrivateChannel().queue(
-                    ch -> ch.sendMessageEmbeds(eb.build())
-                            .setActionRow(
-                                    Button.success(cidAccept, msg.raw("discord.ip_confirm_button_accept")),
-                                    Button.danger (cidReject, msg.raw("discord.ip_confirm_button_reject"))
+                    c -> c.sendMessageEmbeds(eb.build())
+                            .setComponents(
+                                    ActionRow.of(
+                                            Button.success(cidAccept, msg.raw("discord.ip_confirm_button_accept")),
+                                            Button.danger(cidReject, msg.raw("discord.ip_confirm_button_reject"))
+                                    )
                             ).queue(
-                                    s  -> {},
-                                    ex -> log.warning("[LogDO2] DM send failed (ipConfirm): " + ex.getMessage())
-                            ),
-                    ex -> log.warning("[LogDO2] Open DM failed (ipConfirm): " + ex.getMessage())
+                                    s -> {},
+                                    f -> log.warn("Unable to send user direct message", f)
+                            )
             );
-        }, ex -> log.warning("[LogDO2] retrieveUserById failed (ipConfirm): " + ex.getMessage()));
+        }, ex -> log.warn("Unable to retrieve user", ex));
     }
 
     @Override
-    public void sendFinalizeOAuthLink(long discordId, String url) {
+    public void sendOAuth2URLMessage(long discordId, String url) {
         jda.retrieveUserById(discordId).queue(user -> {
             String text = msg.raw("discord.finalize_oauth_link").replace("{url}", url);
             user.openPrivateChannel().queue(
                     ch -> ch.sendMessage(text).queue(
                             s  -> {},
-                            ex -> log.warning("[LogDO2] DM send failed (finalizeOAuth): " + ex.getMessage())
+                            ex -> log.warn("Unable to send direct message to user", ex)
                     ),
-                    ex -> log.warning("[LogDO2] Open DM failed (finalizeOAuth): " + ex.getMessage())
+                    ex -> log.warn("Unable to send direct message to user", ex)
             );
-        }, ex -> log.warning("[LogDO2] retrieveUserById failed (finalizeOAuth): " + ex.getMessage()));
+        }, ex -> log.warn("Unable to send direct message to user", ex));
     }
 
     private void openDmAndSendEmbed(User user, EmbedBuilder eb) {
         user.openPrivateChannel().queue(
                 ch -> ch.sendMessageEmbeds(eb.build()).queue(
                         s  -> {},
-                        ex -> log.warning("[LogDO2] DM send failed (" + "firstLogin" + "): " + ex.getMessage())
+                        ex -> log.warn("Unable to send direct message to user", ex)
                 ),
-                ex -> log.warning("[LogDO2] Open DM failed (" + "firstLogin" + "): " + ex.getMessage())
+                ex -> log.warn("Unable to open direct message with user", ex)
         );
     }
 }
