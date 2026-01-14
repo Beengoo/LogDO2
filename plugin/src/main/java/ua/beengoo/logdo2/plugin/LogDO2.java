@@ -35,6 +35,7 @@ import ua.beengoo.logdo2.plugin.config.Config;
 import ua.beengoo.logdo2.plugin.db.DatabaseManager;
 import ua.beengoo.logdo2.plugin.discord.JDAButtonInteractionListener;
 import ua.beengoo.logdo2.plugin.discord.JDALoginCommandListener;
+import ua.beengoo.logdo2.plugin.discord.JDAPrimaryCommandListener;
 import ua.beengoo.logdo2.plugin.discord.SlashCommandRegistrar;
 import ua.beengoo.logdo2.plugin.i18n.YamlMessages;
 import ua.beengoo.logdo2.plugin.listeners.LogDO2Listener;
@@ -256,6 +257,7 @@ public final class LogDO2 extends JavaPlugin {
                 .addEventListeners(
                         new JDALoginCommandListener(loginService, messages, audit),
                         new JDAButtonInteractionListener(loginService, profileRepo, messages, audit),
+                        new JDAPrimaryCommandListener(accountsRepo, profileRepo, messages, audit),
                         new ListenerAdapter() {
                             @Override public void onReady(@NotNull ReadyEvent event) {
                                 SlashCommandRegistrar.register(jda);

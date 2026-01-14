@@ -58,6 +58,15 @@ discord:
   slash_login_ok: "✅ Linked. Check in-game and finish OAuth if prompted."
   slash_login_invalid: "❌ Invalid or expired code. Rejoin the server to get a new one."
   slash_login_missing_code: "Missing required option: code"
+  slash_primary_no_accounts: "❌ You don't have any linked Minecraft accounts."
+  slash_primary_only_one: "ℹ️ You only have one linked account, so it's already your primary account."
+  slash_primary_placeholder: "Select your primary account"
+  slash_primary_current: "Current primary account"
+  slash_primary_make_primary: "Make this your primary account"
+  slash_primary_choose: "Choose which Minecraft account should be your primary:"
+  slash_primary_success: "✅ Primary account changed to {name}"
+  slash_primary_invalid: "❌ Invalid account selection."
+  slash_primary_error: "❌ An error occurred while changing your primary account."
 
 admin:
   logout_kick: "<red>You have been logged out by an admin. Please rejoin to link again.</red>"

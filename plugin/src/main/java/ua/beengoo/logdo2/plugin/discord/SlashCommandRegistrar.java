@@ -8,7 +8,8 @@ public class SlashCommandRegistrar {
     public static void register(JDA jda) {
         jda.updateCommands().addCommands(
                 Commands.slash("login", "Finish linking your Bedrock account with one-time code")
-                        .addOption(OptionType.STRING, "code", "One-time code from in-game", true)
+                        .addOption(OptionType.STRING, "code", "One-time code from in-game", true),
+                Commands.slash("primary", "Change which Minecraft account is your primary account")
         ).queue();
     }
 }
