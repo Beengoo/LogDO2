@@ -24,6 +24,7 @@ public class YamlMessages implements MessagesProvider {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "messages.yml");
         ensureFile();
+        updateMessagesDefaults();
         reload();
     }
 
@@ -33,6 +34,33 @@ public class YamlMessages implements MessagesProvider {
         }
         if (!file.exists()) {
             plugin.saveResource("messages.yml", false);
+        }
+    }
+
+    private void updateMessagesDefaults() {
+        try {
+            InputStream in = plugin.getResource("messages.yml");
+            if (in == null) return;
+            String text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            YamlConfiguration defaults = new YamlConfiguration();
+            defaults.loadFromString(text);
+
+            YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+            boolean changed = false;
+            for (String key : defaults.getKeys(true)) {
+                if (!cfg.isSet(key)) {
+                    cfg.set(key, defaults.get(key));
+                    changed = true;
+                    log.info("Added missing message key: {}", key);
+                }
+            }
+            if (changed) {
+                cfg.save(file);
+                log.info("Update for messages complete!");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to merge default messages: {}", e.getMessage());
         }
     }
 
