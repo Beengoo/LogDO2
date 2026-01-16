@@ -182,6 +182,11 @@ public class DatabaseManager {
 
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_discord_profile_id ON discord_accounts(profile_id)");
 
+            // Add requires_reauth to discord_accounts if it doesn't exist
+            if (!columnExists.test(c, "requires_reauth")) {
+                st.execute("ALTER TABLE discord_accounts ADD COLUMN requires_reauth INTEGER NOT NULL DEFAULT 0");
+            }
+
             // Initialize data
             st.execute("UPDATE discord_accounts SET created_at = updated_at WHERE created_at IS NULL");
 

@@ -52,6 +52,31 @@ public interface AccountsRepo {
      */
     Map<UUID, Boolean> findLinksWithPrimaryFlag(long discordId);
 
+    /**
+     * Check if a Discord account requires re-authentication.
+     * @param discordId Discord user ID
+     * @return true if Discord account needs to re-authenticate
+     */
+    boolean requiresReauth(long discordId);
+
+    /**
+     * Mark all Discord accounts to require re-authentication.
+     * @return number of Discord accounts affected
+     */
+    int markAllForReauth();
+
+    /**
+     * Mark specific Discord account to require re-authentication.
+     * @param discordId Discord user ID
+     */
+    void markForReauth(long discordId);
+
+    /**
+     * Clear re-authentication requirement (called after successful OAuth).
+     * @param discordId Discord user ID
+     */
+    void clearReauth(long discordId);
+
     void unlinkByProfile(java.util.UUID profileUuid);
     void unlinkByDiscord(long discordId);
 

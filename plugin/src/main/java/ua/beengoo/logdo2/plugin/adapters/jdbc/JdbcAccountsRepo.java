@@ -157,6 +157,12 @@ public class JdbcAccountsRepo implements AccountsRepo {
                 ps.setLong(4, now);
                 ps.executeUpdate();
             }
+
+            // Clear requires_reauth flag from discord_accounts after successful activation
+            try (PreparedStatement ps = c.prepareStatement("UPDATE discord_accounts SET requires_reauth=0 WHERE discord_id=?")) {
+                ps.setLong(1, discordId);
+                ps.executeUpdate();
+            }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -347,5 +353,55 @@ public class JdbcAccountsRepo implements AccountsRepo {
             throw new RuntimeException(e);
         }
         return result;
+    }
+
+    @Override
+    public boolean requiresReauth(long discordId) {
+        String sql = "SELECT requires_reauth FROM discord_accounts WHERE discord_id=? LIMIT 1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1) == 1;
+                return false;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public int markAllForReauth() {
+        String sql = "UPDATE discord_accounts SET requires_reauth=1";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            return ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void markForReauth(long discordId) {
+        String sql = "UPDATE discord_accounts SET requires_reauth=1 WHERE discord_id=?";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void clearReauth(long discordId) {
+        String sql = "UPDATE discord_accounts SET requires_reauth=0 WHERE discord_id=?";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, discordId);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

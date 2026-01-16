@@ -37,8 +37,13 @@ import java.util.stream.Collectors;
 @Slf4j(topic = "LogDO2")
 public class LogDO2Command implements CommandExecutor, TabCompleter {
     private static final DateTimeFormatter LOOKUP_DT = DateTimeFormatter.ofPattern("dd-MM-yy hh:mm a", Locale.ENGLISH);
-    private static final List<String> SUBS = List.of("help", "lookup", "link", "logout", "forgive", "bypass", "reload");
+    private static final List<String> SUBS = List.of("help", "lookup", "link", "logout", "forgive", "bypass", "reload", "force-relogin");
     private static final MiniMessage MINI = MiniMessage.miniMessage();
+    private static final long CONFIRMATION_TIMEOUT_MS = 30_000; // 30 seconds
+
+    // Track pending force-relogin confirmations (sender name -> timestamp)
+    private static final Map<String, Long> pendingForceReloginConfirmations = new java.util.concurrent.ConcurrentHashMap<>();
+
     private final LogDO2Api api;
     private final AccountsRepo accountsRepo;
     private final ProfileRepo profileRepo;
@@ -75,13 +80,14 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "link"    -> handleLink(sender, args);
-            case "logout"  -> handleLogout(sender, args);
-            case "forgive" -> handleForgive(sender, args);
-            case "reload"  -> handleReload(sender);
-            case "bypass"  -> handleBypass(sender, args);
-            case "lookup"  -> handleLookup(sender, args);
-            default        -> sendHelp(sender);
+            case "link"         -> handleLink(sender, args);
+            case "logout"       -> handleLogout(sender, args);
+            case "forgive"      -> handleForgive(sender, args);
+            case "reload"       -> handleReload(sender);
+            case "bypass"       -> handleBypass(sender, args);
+            case "lookup"       -> handleLookup(sender, args);
+            case "force-relogin" -> handleForceRelogin(sender, args);
+            default             -> sendHelp(sender);
         }
         if (audit != null) {
             java.util.Map<String, String> f = new java.util.LinkedHashMap<>();
@@ -100,6 +106,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         s.sendMessage("§e/logdo2 forgive <ip> §7— clear progressive ban & attempts for IP");
         s.sendMessage("§e/logdo2 bypass <player_name|player_uuid> §7— allow profile to ignore per-Discord limit");
         s.sendMessage("§e/logdo2 lookup <player_name|player_uuid|discord_id> §7— get everything we know about player/member");
+        s.sendMessage("§e/logdo2 force-relogin [player_name|player_uuid|discord_id] §7— force re-auth (global requires confirmation)");
         s.sendMessage("§e/logdo2 reload §7— reload config & messages");
     }
 
@@ -519,6 +526,121 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         if (audit != null) audit.log("admin", "reload", java.util.Map.of(
                 "sender", sender.getName()
         ));
+    }
+
+    private void handleForceRelogin(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("logdo2.admin.force-relogin")) { noPerm(sender); return; }
+
+        // Cancel confirmation: /logdo2 force-relogin cancel
+        if (args.length == 2 && args[1].equalsIgnoreCase("cancel")) {
+            if (pendingForceReloginConfirmations.remove(sender.getName()) != null) {
+                sender.sendMessage("§aForce-relogin confirmation cancelled.");
+            } else {
+                sender.sendMessage("§cYou don't have a pending force-relogin confirmation.");
+            }
+            return;
+        }
+
+        // Global mode: /logdo2 force-relogin (requires confirmation)
+        if (args.length == 1) {
+            String senderName = sender.getName();
+            long now = System.currentTimeMillis();
+
+            // Clean up expired confirmations
+            pendingForceReloginConfirmations.entrySet().removeIf(entry ->
+                now - entry.getValue() > CONFIRMATION_TIMEOUT_MS
+            );
+
+            // Check if sender has a pending confirmation
+            Long confirmTimestamp = pendingForceReloginConfirmations.get(senderName);
+            if (confirmTimestamp != null && (now - confirmTimestamp) <= CONFIRMATION_TIMEOUT_MS) {
+                // Confirmation exists and is valid - proceed with execution
+                pendingForceReloginConfirmations.remove(senderName);
+
+                int affected = accountsRepo.markAllForReauth();
+                sender.sendMessage("§aMarked " + affected + " Discord account(s) for re-authentication.");
+                sender.sendMessage("§eAffected players must complete Discord OAuth on next login.");
+
+                // Kick all online players who need to reauth
+                int kicked = 0;
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    Optional<Long> discordId = accountsRepo.findAnyDiscordForProfile(p.getUniqueId());
+                    if (discordId.isPresent() && accountsRepo.requiresReauth(discordId.get())) {
+                        kickIfOnline(p.getUniqueId(), msg.mc("admin.force_relogin_kick"));
+                        kicked++;
+                    }
+                }
+                sender.sendMessage("§eKicked " + kicked + " online player(s).");
+
+                if (audit != null) audit.log("admin", "force_relogin_all", java.util.Map.of(
+                    "sender", sender.getName(),
+                    "affected", String.valueOf(affected)
+                ));
+                return;
+            } else {
+                // No confirmation or expired - show warning and request confirmation
+                pendingForceReloginConfirmations.put(senderName, now);
+                sender.sendMessage("§c§l⚠ WARNING ⚠");
+                sender.sendMessage("§cYou are about to force §lALL§r§c players to re-authenticate!");
+                sender.sendMessage("§cThis will:");
+                sender.sendMessage("§c  • Kick all currently online players (" + Bukkit.getOnlinePlayers().size() + " online)");
+                sender.sendMessage("§c  • Require every player to complete Discord OAuth again");
+                sender.sendMessage("§c  • Affect all linked Discord accounts");
+                sender.sendMessage("");
+                sender.sendMessage("§eRun the command again within 30 seconds to confirm.");
+                sender.sendMessage("§7Type '/logdo2 force-relogin cancel' to abort.");
+                sender.sendMessage("§7(Targeted mode: /logdo2 force-relogin <player|discord_id> - no confirmation needed)");
+                return;
+            }
+        }
+
+        // Targeted mode: /logdo2 force-relogin <player_name|player_uuid|discord_id>
+        String target = args[1];
+
+        // Try as Discord ID first
+        if (isNumeric(target)) {
+            long discordId = Long.parseLong(target);
+            accountsRepo.markForReauth(discordId);
+            sender.sendMessage("§aMarked Discord account " + discordId + " for re-authentication.");
+
+            // Kick affected online players
+            int kicked = 0;
+            for (UUID uuid : accountsRepo.findProfilesForDiscord(discordId)) {
+                kickIfOnline(uuid, msg.mc("admin.force_relogin_kick"));
+                kicked++;
+            }
+            sender.sendMessage("§eKicked " + kicked + " online player(s).");
+
+            if (audit != null) audit.log("admin", "force_relogin_discord", java.util.Map.of(
+                "sender", sender.getName(),
+                "discord", String.valueOf(discordId),
+                "kicked", String.valueOf(kicked)
+            ));
+            return;
+        }
+
+        // Try as player name/UUID
+        UUID targetUuid = resolveUuid(target);
+        if (targetUuid != null) {
+            Optional<Long> discordId = accountsRepo.findAnyDiscordForProfile(targetUuid);
+            if (discordId.isEmpty()) {
+                sender.sendMessage("§cPlayer " + target + " is not linked to any Discord account.");
+                return;
+            }
+
+            accountsRepo.markForReauth(discordId.get());
+            kickIfOnline(targetUuid, msg.mc("admin.force_relogin_kick"));
+            sender.sendMessage("§aMarked player §e" + target + " §7(" + targetUuid + ") for re-authentication.");
+
+            if (audit != null) audit.log("admin", "force_relogin_player", java.util.Map.of(
+                "sender", sender.getName(),
+                "player", targetUuid.toString(),
+                "discord", String.valueOf(discordId.get())
+            ));
+            return;
+        }
+
+        sender.sendMessage("§cCan't resolve target. Use player name/uuid or discord id.");
     }
 
     // ==== utils ====

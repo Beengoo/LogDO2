@@ -70,6 +70,7 @@ discord:
 
 admin:
   logout_kick: "<red>You have been logged out by an admin. Please rejoin to link again.</red>"
+  force_relogin_kick: "<red>Re-authentication required. Please rejoin and complete Discord OAuth.</red>"
 
 limits:
   simultaneous_kick: "<red>Another profile linked to your Discord is already online: {other}</red>"

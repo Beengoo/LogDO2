@@ -7,7 +7,7 @@ commands:
   logdo2:
     aliases: [l2]
     description: Main LogDO2 command
-    usage: "/<command> <help|link|logout|forgive|bypass|reload>"
+    usage: "/<command> <help|link|logout|forgive|bypass|reload|force-relogin>"
     permission: logdo2.admin
 permissions:
   logdo2.admin:
@@ -18,8 +18,10 @@ permissions:
       logdo2.admin.forgive: true
       logdo2.admin.bypass: true
       logdo2.admin.reload: true
+      logdo2.admin.force-relogin: true
   logdo2.admin.link: { default: op }
   logdo2.admin.logout: { default: op }
   logdo2.admin.forgive: { default: op }
   logdo2.admin.bypass: { default: op }
   logdo2.admin.reload: { default: op }
+  logdo2.admin.force-relogin: { default: op, description: "Force players to re-authenticate via Discord OAuth" }

@@ -91,3 +91,14 @@ BEGIN
           AND links.mc_uuid = first_links.mc_uuid;
     END IF;
 END $$;
+
+-- Add requires_reauth to discord_accounts
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name='discord_accounts' AND column_name='requires_reauth'
+    ) THEN
+        ALTER TABLE discord_accounts ADD COLUMN requires_reauth INTEGER NOT NULL DEFAULT 0;
+    END IF;
+END $$;

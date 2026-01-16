@@ -118,3 +118,18 @@ INNER JOIN (
     WHERE rn = 1
 ) first_links ON l1.discord_id = first_links.discord_id AND l1.mc_uuid = first_links.mc_uuid
 SET l1.is_primary = 1;
+
+-- Add requires_reauth to discord_accounts
+SET @tablename = 'discord_accounts';
+SET @columnname = 'requires_reauth';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE (TABLE_SCHEMA = @dbname)
+     AND (TABLE_NAME = @tablename)
+     AND (COLUMN_NAME = @columnname)) > 0,
+  'SELECT 1',
+  'ALTER TABLE discord_accounts ADD COLUMN requires_reauth TINYINT(1) NOT NULL DEFAULT 0'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;

@@ -55,10 +55,11 @@ Keep this key secret. Changing it will invalidate stored tokens.
 - `/logdo2 logout <player|uuid|discord_id>`: Unlink target; kicks online players linked to that Discord.
 - `/logdo2 logout <discord_id> <player|uuid>`: Unlink only that mapping.
 - `/logdo2 forgive <ip>`: Reset progressive ban tracking for the IP.
+- `/logdo2 force-relogin [player_name|player_uuid|discord_id]`: Force all (or specific) players to re-login into discord
 - `/logdo2 bypass <player|uuid>`: Allow profile to ignore per-Discord limit (OAuth still required)
 - `/logdo2 reload`: Reload config and messages.
 
-Permission: `logdo2.admin` (children: `logdo2.admin.link`, `logout`, `forgive`, `bypass`, `lookup`, `reload`).
+Permission: `logdo2.admin` (children: `logdo2.admin.link`, `force-relogin`, `logout`, `forgive`, `bypass`, `lookup`, `reload`).
 
 ## API
 Currently not tested at any projects, but exists!

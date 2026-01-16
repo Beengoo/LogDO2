@@ -65,6 +65,24 @@ public class LoginService {
         profiles.updatePlatform(uuid, bedrock ? "BEDROCK" : "JAVA");
         Properties props = propertiesProvider.getSnapshot();
 
+        // Check if linked account requires re-authentication
+        Optional<Long> linkedDiscord = accounts.findAnyDiscordForProfile(uuid);
+        if (linkedDiscord.isPresent() && accounts.requiresReauth(linkedDiscord.get())) {
+            // Profile is linked but Discord account requires re-auth
+            // Start OAuth flow but link remains reserved to original Discord ID
+            if (bedrock) {
+                String code = state.createOneTimeCode(uuid, currentIp, name);
+                state.recordBedrockCodeShown(uuid, code);
+                state.markPendingLogin(uuid, currentIp, code, true);
+                firePhaseEnter(uuid, LoginPhase.LOGIN, new LoginCallbacks.PlayerLoginData(true, code));
+            } else {
+                String token = state.createOAuthState(uuid, currentIp, name, false);
+                firePhaseEnter(uuid, LoginPhase.LOGIN, new LoginCallbacks.PlayerLoginData(false, token));
+                state.markPendingLogin(uuid, currentIp, token, false);
+            }
+            return;
+        }
+
         if (!accounts.isLinked(uuid)) {
             if (bedrock) {
                 String code = state.recentBedrockCodeAfterLeave(uuid, Duration.ofSeconds(props.bedrockCodeTimeAfterLeave))
