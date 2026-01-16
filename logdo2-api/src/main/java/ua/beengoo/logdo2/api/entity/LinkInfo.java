@@ -17,7 +17,7 @@ public class LinkInfo implements BaseLinkInfo {
     }
 
     @Override
-    public BaseMinecraftProfile getMinecraftProfile() {
+    public MinecraftProfile getMinecraftProfile() {
         return minecraftProfile;
     }
 
