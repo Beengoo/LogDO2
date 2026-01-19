@@ -45,7 +45,7 @@ public class PlayerListener implements Listener {
     }
 
     @SuppressWarnings("deprecation")
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onLogin(PlayerLoginEvent e) {
         Player p = e.getPlayer();
         String ip = Optional.of(e.getAddress()).map(InetAddress::getHostAddress).orElse("unknown");
@@ -66,7 +66,7 @@ public class PlayerListener implements Listener {
         reasonOpt.ifPresent(reason -> e.disallow(PlayerLoginEvent.Result.KICK_OTHER, MINI.deserialize(reason)));
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         String ip = getIp(p);
@@ -107,7 +107,7 @@ public class PlayerListener implements Listener {
     }
 
     // === BLOCKERS ===
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onMove(PlayerMoveEvent e) {
         if (!isAllowed(e.getPlayer(), Action.MOVE)) {
             if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
@@ -120,7 +120,7 @@ public class PlayerListener implements Listener {
         else refreshVisuals(e.getPlayer());
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onInteract(PlayerInteractEvent e) {
         if (!isAllowed(e.getPlayer(), Action.INTERACT)) {
             if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
@@ -132,7 +132,7 @@ public class PlayerListener implements Listener {
         } else refreshVisuals(e.getPlayer());
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onChat(AsyncChatEvent e) {
         if (!isAllowed(e.getPlayer(), Action.CHAT)) {
             if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
@@ -145,7 +145,7 @@ public class PlayerListener implements Listener {
 
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onCommand(PlayerCommandPreprocessEvent e) {
         Player p = e.getPlayer();
         String msg = e.getMessage();
@@ -161,7 +161,7 @@ public class PlayerListener implements Listener {
         else refreshVisuals(p);
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onDrop(PlayerDropItemEvent e) {
         if (!isAllowed(e.getPlayer(), Action.DROP)) {
             if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock(e.getPlayer())) {
@@ -174,7 +174,7 @@ public class PlayerListener implements Listener {
         else refreshVisuals(e.getPlayer());
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onInventory(InventoryOpenEvent e) {
         if (e.getPlayer() instanceof Player p && !isAllowed(p, Action.INVENTORY)) {
             if (Config.getFileConfiguration().getBoolean("advanced.useDialogs") && !isBedrock((Player) e.getPlayer())) {
@@ -187,7 +187,7 @@ public class PlayerListener implements Listener {
         else if (e.getPlayer() instanceof Player p) refreshVisuals(p);
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onDamage(EntityDamageEvent e) {
         if (!(e.getEntity() instanceof Player p)) return;
         if (!isAllowed(p, Action.DAMAGE)) {
