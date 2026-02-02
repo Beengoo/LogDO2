@@ -18,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
 import ua.beengoo.logdo2.api.LogDO2Api;
 import ua.beengoo.logdo2.api.entity.LinkInfo;
 import ua.beengoo.logdo2.api.entity.LogDO2Profile;
+import ua.beengoo.logdo2.api.entity.LogDO2ProfileStatus;
 import ua.beengoo.logdo2.api.events.LogDO2ReloadEvent;
 import ua.beengoo.logdo2.api.spi.repo.*;
 import ua.beengoo.logdo2.api.spi.providers.MessagesProvider;
@@ -132,7 +133,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
                 LinkInfo primary = profile.getLinkInfo().stream()
                         .filter(LinkInfo::isPrimary)
                         .findFirst()
-                        .orElseGet(() -> profile.getLinkInfo().get(0));
+                        .orElseGet(() -> profile.getLinkInfo().getFirst());
                 resolvedUuid = primary.getMinecraftProfile().getUuid();
                 resolvedName = primary.getMinecraftProfile().getName();
             } else {
@@ -183,9 +184,15 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
 
         outComponents.add(Component.text("=== Lookup Result ===").color(NamedTextColor.GOLD));
         outComponents.add(Component.text("Query: ").append(Component.text(target).color(NamedTextColor.WHITE)));
-        outComponents.add(buildLabeledCopyComponent("Profile ID: ", String.valueOf(profile.getProfileId())));
-        // If detected Discord id and profile exists
-        if (resolvedDiscord != null && profile != null) {
+
+        if (profile != null && profile.getProfileStatus().equals(LogDO2ProfileStatus.AUTHORIZED)) {
+            outComponents.add(buildLabeledCopyComponent("Profile ID: ", String.valueOf(profile.getProfileId())));
+        } else {
+            outComponents.add(buildLabeledCopyComponent("Profile ID: ", "Not authorized yet..."));
+        }
+
+        // If detected Discord id exists
+        if (resolvedDiscord != null) {
             outPlain.append("Discord ID: ").append(resolvedDiscord).append("\n");
             outComponents.add(buildLabeledCopyComponent("Discord ID: ", String.valueOf(resolvedDiscord)));
 
