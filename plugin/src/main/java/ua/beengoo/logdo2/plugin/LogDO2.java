@@ -3,6 +3,7 @@ package ua.beengoo.logdo2.plugin;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -118,6 +119,7 @@ public final class LogDO2 extends JavaPlugin {
         String scopes       = getConfig().getString("oauth.scopes", "identify email applications.commands");
 
         List<String> intentNames = getConfig().getStringList("discord.intents");
+        List<String> cacheFlags = getConfig().getStringList("discord.cacheFlags");
 
         boolean enableCacheChunking = getConfig().getBoolean("discord.enableCacheChunking");
         boolean cacheAllGuildMembers = getConfig().getBoolean("discord.cacheAllGuildMembers");
@@ -182,7 +184,7 @@ public final class LogDO2 extends JavaPlugin {
                 loginCallbacks
         );
 
-        startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
+        startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers, cacheFlags);
 
         DiscordMessagesProvider externalMP = getServer().getServicesManager().load(DiscordMessagesProvider.class);
         if (externalMP != null) {
@@ -248,8 +250,8 @@ public final class LogDO2 extends JavaPlugin {
         log.info("LogDO2 is ready!");
     }
     public void startJDA(String botToken, List<String> intentNames,
-                        boolean enableCacheChunking, boolean cacheAllGuildMembers
-    ){
+                        boolean enableCacheChunking, boolean cacheAllGuildMembers,
+                         List<String> cacheFlags){
         var jdaBuilder = JDABuilder.createDefault(
                         botToken,
                         EnumsUtil.parseEnums(GatewayIntent.class, intentNames)
@@ -267,7 +269,7 @@ public final class LogDO2 extends JavaPlugin {
                                 }
                             }
                         }
-                );
+                ).enableCache(EnumsUtil.parseEnums(CacheFlag.class, cacheFlags));
 
         if (enableCacheChunking) {
             jdaBuilder.setMemberCachePolicy(MemberCachePolicy.ALL);
@@ -291,12 +293,12 @@ public final class LogDO2 extends JavaPlugin {
     }
 
     public void restartJDA(String botToken, List<String> intentNames,
-                            boolean enableCacheChunking, boolean cacheAllGuildMembers){
+                            boolean enableCacheChunking, boolean cacheAllGuildMembers, List<String> cacheFlags){
         shutdownJDA();
         if (jda != null) {
             jda = null;
         }
-        startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers);
+        startJDA(botToken, intentNames, enableCacheChunking, cacheAllGuildMembers, cacheFlags);
     }
 
     private void configureLogging() {

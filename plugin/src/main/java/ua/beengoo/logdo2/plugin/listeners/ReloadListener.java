@@ -20,7 +20,8 @@ public class ReloadListener implements Listener {
         logDO2.restartJDA(Config.getFileConfiguration().getString("discord.botToken"),
                 Config.getFileConfiguration().getStringList("discord.intents"),
                 Config.getFileConfiguration().getBoolean("discord.enableCacheChunking"),
-                Config.getFileConfiguration().getBoolean("discord.cacheAllGuildMembers"));
+                Config.getFileConfiguration().getBoolean("discord.cacheAllGuildMembers"),
+                Config.getFileConfiguration().getStringList("discord.cacheFlags"));
         logDO2.getLogdo2API().setDiscordBot(logDO2.getJda());
     }
 
