@@ -1,3 +1,8 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
 dependencies {
     implementation project(':logdo2-api')
     compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
@@ -8,4 +13,42 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     testImplementation 'org.mockito:mockito-core:5.8.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = "core"
+            pom {
+                name = "LogDO2 Core"
+                description = "Internal LogDO2 plugin logic"
+                url = "https://github.com/Pinecraft-Project/LogDO2"
+                licenses {
+                    license {
+                        name = "Mozilla Public License 2.0"
+                        url = "https://www.mozilla.org/en-US/MPL/2.0/"
+                    }
+                }
+                developers {
+                    developer {
+                        id = "beengoo"
+                        name = "Beengoo"
+                    }
+                }
+                scm {
+                    url = "https://github.com/Pinecraft-Project/LogDO2.git"
+                    connection = "scm:git:https://github.com/Pinecraft-Project/LogDO2.git"
+                    developerConnection = "scm:git:ssh://git@github.com/Pinecraft-Project/LogDO2.git"
+                }
+            }
+        }
+    }
+    repositories {
+        // Local staging; CI pushes this folder to gh-pages of maven-repo
+        maven {
+            name = "localGhPages"
+            url = layout.buildDirectory.dir("repo-staging")
+        }
+    }
 }
