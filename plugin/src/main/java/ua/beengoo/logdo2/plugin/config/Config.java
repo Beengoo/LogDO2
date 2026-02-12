@@ -27,6 +27,7 @@ public class Config {
     }
 
     public static void reload() {
+        plugin.reloadConfig();
         fileConfiguration = plugin.getConfig();
         LogDO2PropertiesManager.getINSTANCE().reload(plugin);
     }

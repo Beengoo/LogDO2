@@ -1,6 +1,7 @@
 package ua.beengoo.logdo2.plugin;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
@@ -102,6 +103,7 @@ public final class LogDO2 extends JavaPlugin {
     private LogDO2ApiImpl logdo2API;
     @Getter
     private LoginConditionEvaluator conditionEvaluator;
+    @Setter
     @Getter
     private WebServerInfo webServerInfo;
 
@@ -218,7 +220,6 @@ public final class LogDO2 extends JavaPlugin {
         String inviteChannelId = getConfig().getString("discord.inviteChannelId", "");
 
         this.httpLoginServer = new HttpLoginServer(
-                webServerInfo,
                 loginService,
                 jda,
                 postAction, postText, redirectUrlCfg,
@@ -227,7 +228,7 @@ public final class LogDO2 extends JavaPlugin {
         );
         this.httpLoginServer.start();
 
-        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, tokensRepo, discordUserRepo, loginStatePort, webServerInfo, jda, targetGuildId);
+        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, tokensRepo, discordUserRepo, loginStatePort, jda, targetGuildId);
 
         LogDO2Command cmd = new LogDO2Command(logdo2API, accountsRepo, profileRepo, banProgressRepo, discordUserRepo, messages, audit, jda);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);

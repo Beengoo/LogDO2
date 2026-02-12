@@ -529,7 +529,7 @@ public class LogDO2Command implements CommandExecutor, TabCompleter {
         Config.reload();
         if (msg instanceof YamlMessages ym) ym.reload();
         Bukkit.getPluginManager().callEvent(new LogDO2ReloadEvent());
-        sender.sendMessage("§aLogDO2 configuration reloaded!");
+        sender.sendMessage("§aLogDO2 reloaded!");
         if (audit != null) audit.log("admin", "reload", java.util.Map.of(
                 "sender", sender.getName()
         ));

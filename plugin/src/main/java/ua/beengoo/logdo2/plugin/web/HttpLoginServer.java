@@ -2,6 +2,7 @@ package ua.beengoo.logdo2.plugin.web;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
@@ -12,13 +13,13 @@ import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.api.entity.WebServerInfo;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.ForbiddenLinkException;
+import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
 
 import java.util.Map;
 
 @Slf4j(topic = "LogDO2")
 public class HttpLoginServer {
-    private WebServerInfo webServerInfo;
     private final LoginService loginService;
     private final JDA jda;
     private final String postAction;
@@ -29,7 +30,7 @@ public class HttpLoginServer {
     private Javalin app;
     private final AuditLogger audit;
 
-    public HttpLoginServer(WebServerInfo webServerInfo, LoginService loginService,
+    public HttpLoginServer(LoginService loginService,
                            JDA jda,
                            String postAction,
                            String postText,
@@ -37,7 +38,6 @@ public class HttpLoginServer {
                            String targetGuildId,
                            String inviteChannelId,
                            AuditLogger audit) {
-        this.webServerInfo = webServerInfo;
         this.loginService = loginService;
         this.jda = jda;
         this.postAction = postAction == null ? "text" : postAction.trim().toLowerCase();
@@ -49,21 +49,23 @@ public class HttpLoginServer {
     }
 
     public void start() {
-        app = Javalin.create(javalinConfig -> javalinConfig.showJavalinBanner = false).start(webServerInfo.host(), webServerInfo.port());
-        app.get(webServerInfo.loginEndpoint(), this::handleLogin);
-        app.get(webServerInfo.callbackEndpoint(), this::handleCallback);
-        log.info("Running web server on {}:{} (login: {} callback: {})",webServerInfo.host() , webServerInfo.port(), webServerInfo.getPublicLoginURL(), webServerInfo.getPublicCallbackURL());
+        WebServerInfo wsi = LogDO2.getInstance().getWebServerInfo();
+        app = Javalin.create(javalinConfig -> javalinConfig.showJavalinBanner = false).start(wsi.host(), wsi.port());
+        app.get(wsi.loginEndpoint(), this::handleLogin);
+        app.get(wsi.callbackEndpoint(), this::handleCallback);
+        log.info("Running web server on {}:{} (login: {} callback: {})",wsi.host() , wsi.port(), wsi.getPublicLoginURL(), wsi.getPublicCallbackURL());
     }
         
     public void stop() {
         if (app != null) app.stop();
     }
 
-    public void restart(WebServerInfo newWebServerInfo){
-        if (app != null && newWebServerInfo != null && app.port() != newWebServerInfo.port()) {
-            this.webServerInfo = newWebServerInfo;
+    public void restart(){
+        if (app != null) {
             app.stop();
             start();
+        } else {
+            log.warn("Web server is already down, please restart Minecraft server!");
         }
     }
 

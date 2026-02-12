@@ -2,6 +2,7 @@ package ua.beengoo.logdo2.plugin.listeners;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import ua.beengoo.logdo2.api.entity.WebServerInfo;
 import ua.beengoo.logdo2.api.events.LogDO2ReloadEvent;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.config.Config;
@@ -16,7 +17,10 @@ public class ReloadListener implements Listener {
 
     @EventHandler
     public void onPluginReload(LogDO2ReloadEvent event) {
-        logDO2.getHttpLoginServer().restart(Config.buildWebServerInfo());
+        WebServerInfo wsi = Config.buildWebServerInfo();
+        logDO2.getLoginService().updateWebServerInfo(wsi);
+        logDO2.setWebServerInfo(wsi);
+        logDO2.getHttpLoginServer().restart();
         logDO2.restartJDA(Config.getFileConfiguration().getString("discord.botToken"),
                 Config.getFileConfiguration().getStringList("discord.intents"),
                 Config.getFileConfiguration().getBoolean("discord.enableCacheChunking"),

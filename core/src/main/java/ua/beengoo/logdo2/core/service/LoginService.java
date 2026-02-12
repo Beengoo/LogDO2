@@ -23,7 +23,7 @@ public class LoginService {
     private final TokensRepo tokens;
     private final LoginStateService state;
     private final DiscordUserRepo discordUserRepo;
-    private final WebServerInfo webServerInfo;
+    private WebServerInfo webServerInfo;
     private final PlatformBridge platform;
     private final LoginCallbacks callbacks;
     private final MessagesProvider msg;
@@ -58,6 +58,8 @@ public class LoginService {
     }
 
     public void setDiscordDmPort(DiscordMessagesProvider dm) { this.dm = dm; }
+
+    public void updateWebServerInfo(WebServerInfo webServerInfo) { this.webServerInfo = webServerInfo; }
 
     public void handlePlayerJoin(UUID uuid, String name, String currentIp, boolean bedrock) {
         profiles.upsertName(uuid, name);

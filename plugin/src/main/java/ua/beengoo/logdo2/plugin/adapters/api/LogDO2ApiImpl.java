@@ -12,6 +12,7 @@ import ua.beengoo.logdo2.api.spi.repo.ProfileRepo;
 import ua.beengoo.logdo2.api.spi.repo.TokensRepo;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.LoginStateService;
+import ua.beengoo.logdo2.plugin.LogDO2;
 
 import java.util.UUID;
 
@@ -22,7 +23,6 @@ public class LogDO2ApiImpl implements LogDO2Api {
     private final TokensRepo tokens;
     private final DiscordUserRepo discordUsers;
     private final LoginStateService loginState;
-    private final WebServerInfo webServerInfo;
     @Setter
     private JDA discordBot;
     private final String targetGuildId;
@@ -33,7 +33,6 @@ public class LogDO2ApiImpl implements LogDO2Api {
                          TokensRepo tokens,
                          DiscordUserRepo discordUsers,
                          LoginStateService loginState,
-                         WebServerInfo webServerInfo,
                          JDA discordBot,
                          String targetGuildId) {
         this.service = service;
@@ -42,7 +41,6 @@ public class LogDO2ApiImpl implements LogDO2Api {
         this.tokens = tokens;
         this.discordUsers = discordUsers;
         this.loginState = loginState;
-        this.webServerInfo = webServerInfo;
         this.discordBot = discordBot;
         this.targetGuildId = targetGuildId;
     }
@@ -84,7 +82,7 @@ public class LogDO2ApiImpl implements LogDO2Api {
 
     @Override
     public WebServerInfo getWebServerInfo() {
-        return webServerInfo;
+        return LogDO2.getInstance().getWebServerInfo();
     }
 
     @Override
