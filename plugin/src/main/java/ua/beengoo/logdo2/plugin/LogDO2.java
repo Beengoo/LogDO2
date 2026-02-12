@@ -262,7 +262,8 @@ public final class LogDO2 extends JavaPlugin {
                 "Where do i type password?",
                 "Hytale soon",
                 "By Beengoo",
-                "Not that simple as it sounds"
+                "Not that simple as it sounds",
+                "Your IP is: localhost",
         };
         String art = """
                     __                ____  ____ ___\s
