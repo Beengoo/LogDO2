@@ -20,6 +20,7 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import ua.beengoo.logdo2.api.LogDO2Api;
+import ua.beengoo.logdo2.api.entity.WebServerInfo;
 import ua.beengoo.logdo2.api.spi.PlatformBridge;
 import ua.beengoo.logdo2.api.spi.callbacks.LoginCallbacks;
 import ua.beengoo.logdo2.api.spi.repo.*;
@@ -101,6 +102,8 @@ public final class LogDO2 extends JavaPlugin {
     private LogDO2ApiImpl logdo2API;
     @Getter
     private LoginConditionEvaluator conditionEvaluator;
+    @Getter
+    private WebServerInfo webServerInfo;
 
     @Override
     public void onEnable() {
@@ -111,8 +114,8 @@ public final class LogDO2 extends JavaPlugin {
         Config.updateConfigDefaults();
         this.messages = new YamlMessages(this);
 
-        int    webPort      = getConfig().getInt("web.port", 8080);
-        String publicUrl    = StringUtil.stripTrailingSlash(getConfig().getString("web.publicUrl", "http://localhost:" + webPort));
+        this.webServerInfo = Config.buildWebServerInfo();
+
         String botToken     = getConfig().getString("discord.botToken", "");
         String clientId     = getConfig().getString("oauth.clientId", "");
         String clientSecret = getConfig().getString("oauth.clientSecret", "");
@@ -174,8 +177,8 @@ public final class LogDO2 extends JavaPlugin {
 
         this.loginService = new LoginService(
                 authProvider, null,
-                accountsRepo, profileRepo, tokensRepo, loginStatePort, getLogger(),
-                publicUrl,
+                accountsRepo, profileRepo, tokensRepo, loginStatePort,
+                webServerInfo,
                 discordUserRepo,
                 banProgressRepo,
                 LogDO2PropertiesManager.getINSTANCE(),
@@ -215,15 +218,16 @@ public final class LogDO2 extends JavaPlugin {
         String inviteChannelId = getConfig().getString("discord.inviteChannelId", "");
 
         this.httpLoginServer = new HttpLoginServer(
+                webServerInfo,
                 loginService,
                 jda,
                 postAction, postText, redirectUrlCfg,
                 targetGuildId, inviteChannelId,
                 audit
         );
-        this.httpLoginServer.start(webPort);
+        this.httpLoginServer.start();
 
-        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, tokensRepo, discordUserRepo, loginStatePort, jda, targetGuildId);
+        this.logdo2API = new LogDO2ApiImpl(loginService, profileRepo, accountsRepo, tokensRepo, discordUserRepo, loginStatePort, webServerInfo, jda, targetGuildId);
 
         LogDO2Command cmd = new LogDO2Command(logdo2API, accountsRepo, profileRepo, banProgressRepo, discordUserRepo, messages, audit, jda);
         Objects.requireNonNull(getCommand("logdo2")).setExecutor(cmd);
@@ -283,12 +287,11 @@ public final class LogDO2 extends JavaPlugin {
     private void shutdownJDA(){
         if (jda != null) {
             try {
-                log.info("Waiting 5 seconds for JDA to shutdown");
-                jda.awaitShutdown(Duration.ofSeconds(5));
+                log.info("Waiting 2 seconds for JDA to shutdown properly...");
+                jda.awaitShutdown(Duration.ofSeconds(2));
             } catch (Exception e) {
                 log.warn("JDA shutdown was interrupted or timed out!");
             }
-
         }
     }
 

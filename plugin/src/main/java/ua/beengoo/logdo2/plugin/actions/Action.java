@@ -35,16 +35,13 @@ public class Action {
 
     public static void sendClickableAuth(UUID uuid, String token) {
         runPlayer(uuid, p -> {
-            String publicUrl = StringUtil.stripTrailingSlash(
-                    Config.getFileConfiguration().getString("web.publicUrl")
-            );
             Component comp = MINI.deserialize(LogDO2.getInstance().getMessages().mc("chat.auth_link_text"))
                     .hoverEvent(
                             HoverEvent.showText(
                                     MINI.deserialize(LogDO2.getInstance().getMessages().mc("chat.auth_link_hover"))
                             )
                     )
-                    .clickEvent(ClickEvent.openUrl(publicUrl + "/login?state=" + token));
+                    .clickEvent(ClickEvent.openUrl(LogDO2.getInstance().getWebServerInfo().getPublicLoginURL() + "?state=" + token));
             p.sendMessage(comp);
         });
     }
@@ -167,9 +164,6 @@ public class Action {
 
     public static void showLoginPhaseDialog(@NotNull UUID uniqueId, String _token) {
         runPlayer(uniqueId, player -> {
-            String publicUrl = StringUtil.stripTrailingSlash(
-                    Config.getFileConfiguration().getString("web.publicUrl")
-            );
             String token = null;
             if (_token == null) {
                 for (LoginStateService.PendingLogin pl: LogDO2.getInstance().getLoginStatePort().listPendingLogins()) {
@@ -178,7 +172,7 @@ public class Action {
                     }
                 }
             } else token = _token;
-            String loginUrl = publicUrl + "/login?state=" + token;
+            String loginUrl = LogDO2.getInstance().getWebServerInfo().getPublicLoginURL() + "?state=" + token;
             boolean closeable = Config.getFileConfiguration().getBoolean("gates.login.move");
             MessagesProvider m = LogDO2.getInstance().getMessages();
             player.showDialog(Dialog.create(builder -> builder.empty()

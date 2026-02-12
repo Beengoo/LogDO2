@@ -6,7 +6,7 @@ public interface DiscordMessagesProvider {
     /**
      * First message bot will send to user after authentication
     */
-    void sendGreetingsMessage(long discordId, UUID mcUuid, String playerName, String publicUrl);
+    void sendGreetingsMessage(long discordId, UUID mcUuid, String playerName);
 
     /**
      * Confirm message bot will send to user when IP was changed

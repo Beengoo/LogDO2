@@ -24,7 +24,7 @@ public class JdaDiscordDmAdapter implements DiscordMessagesProvider {
     }
 
     @Override
-    public void sendGreetingsMessage(long discordId, UUID mcUuid, String playerName, String publicUrl) {
+    public void sendGreetingsMessage(long discordId, UUID mcUuid, String playerName) {
         jda.retrieveUserById(discordId).queue(user -> {
             String title = msg.raw("discord.ip_confirm_title");
             String body  = msg.raw("discord.first_login_dm")

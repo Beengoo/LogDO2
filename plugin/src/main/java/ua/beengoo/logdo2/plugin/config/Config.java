@@ -3,8 +3,14 @@ package ua.beengoo.logdo2.plugin.config;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
+import ua.beengoo.logdo2.api.entity.WebServerInfo;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.props.LogDO2PropertiesManager;
+
+import java.io.File;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j(topic = "LogDO2")
 public class Config {
@@ -25,18 +31,25 @@ public class Config {
         LogDO2PropertiesManager.getINSTANCE().reload(plugin);
     }
 
-
+    public static WebServerInfo buildWebServerInfo(){
+        return new WebServerInfo(
+                fileConfiguration.getString("web.host", "localhost"),
+                fileConfiguration.getInt("web.port", 3180),
+                fileConfiguration.getString("web.publicUrl", "http://localhost:" + fileConfiguration.getInt("web.port", 8080)),
+                "/login", "/login/callback"
+        );
+    }
 
     public static void updateConfigDefaults() {
         try {
-            java.io.InputStream in = plugin.getResource("config.yml");
+            InputStream in = plugin.getResource("config.yml");
             if (in == null) return;
-            String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            org.bukkit.configuration.file.YamlConfiguration defaults = new org.bukkit.configuration.file.YamlConfiguration();
+            String text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            YamlConfiguration defaults = new YamlConfiguration();
             defaults.loadFromString(text);
 
-            java.io.File file = new java.io.File(plugin.getDataFolder(), "config.yml");
-            org.bukkit.configuration.file.YamlConfiguration cfg = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+            File file = new File(plugin.getDataFolder(), "config.yml");
+            YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
 
             boolean changed = false;
             for (String key : defaults.getKeys(true)) {
@@ -50,7 +63,7 @@ public class Config {
                 plugin.reloadConfig();
             }
         } catch (Exception e) {
-            log.warn("Failed to marge default config", e);
+            log.warn("Failed to merge default config", e);
         }
     }
 

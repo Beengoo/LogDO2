@@ -1,14 +1,19 @@
 package ua.beengoo.logdo2.api;
 
 import ua.beengoo.logdo2.api.entity.LogDO2Profile;
+import ua.beengoo.logdo2.api.entity.WebServerInfo;
 
 import java.util.UUID;
 
 /**
- * Public API for LogDO2 - simple read-only queries for external plugins.
- * This API provides access to unified profile entities and basic helper methods.
+ * Public API for LogDO2 - simple queries for external plugins.
  */
 public interface LogDO2Api {
+    /**
+     * Is API implementation made for Minecraft Proxy software
+     * @return true, if implementation is made for proxy software, not actual server
+     */
+    boolean isProxySoftware();
 
     /**
      * Get a unified profile by Discord ID
@@ -25,10 +30,22 @@ public interface LogDO2Api {
     LogDO2Profile getProfile(UUID minecraftUUID);
 
     /**
-     * Get the Discord bot instance for integrations
-     * @return The Discord bot instance (JDA)
+     * Get the Discord bot instance
+     * @return The Discord bot instance
      */
     Object getDiscordBot();
+
+    /**
+     * Get Discord API provider
+     * @return The Discord API provider name
+     */
+    String getDiscordAPiProvider();
+
+    /**
+     * Gets web server implementation info
+     * @return WebServerInfo object
+     */
+    WebServerInfo getWebServerInfo();
 
     /**
      * Get the target Discord guild ID

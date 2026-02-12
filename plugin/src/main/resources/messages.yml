@@ -47,7 +47,7 @@ chat:
   auth_link_hover: "Open Discord OAuth2"
 
 discord:
-  first_login_dm: "<green>Your Minecraft account {name} ({uuid}) has been linked. Welcome!</green>"
+  first_login_dm: "Your Minecraft account {name} ({uuid}) has been linked. Welcome!"
   ip_confirm_title: "New login detected"
   ip_confirm_title_confirmed: "✅ Login confirmed for {name} ({uuid})"
   ip_confirm_title_rejected: "❌ Login rejected for {name} ({uuid})"

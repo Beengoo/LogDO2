@@ -23,7 +23,7 @@ public class BukkitLoginCallbacks implements LoginCallbacks {
     }
 
     @Override
-    public void onPhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginData data) {
+    public void onLoginPhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginData data) {
         // Convert to Bukkit event data
         PlayerLoginPhaseEnterEvent.PlayerLoginData eventData = data != null
                 ? new PlayerLoginPhaseEnterEvent.PlayerLoginData(data.bedrock(), data.token())
@@ -39,7 +39,7 @@ public class BukkitLoginCallbacks implements LoginCallbacks {
     }
 
     @Override
-    public void onPhaseExit(UUID uuid, LoginPhase phase, LoginExitReason reason) {
+    public void onLoginPhaseExit(UUID uuid, LoginPhase phase, LoginExitReason reason) {
         runPlayer(uuid, player -> {
             try {
                 Bukkit.getPluginManager().callEvent(new PlayerLoginPhaseExitEvent(player, phase, reason));

@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.Invite;
 import net.dv8tion.jda.api.requests.restaction.InviteAction;
 import org.jetbrains.annotations.NotNull;
+import ua.beengoo.logdo2.api.entity.WebServerInfo;
 import ua.beengoo.logdo2.core.service.LoginService;
 import ua.beengoo.logdo2.core.service.ForbiddenLinkException;
 import ua.beengoo.logdo2.plugin.util.AuditLogger;
@@ -17,6 +18,7 @@ import java.util.Map;
 
 @Slf4j(topic = "LogDO2")
 public class HttpLoginServer {
+    private WebServerInfo webServerInfo;
     private final LoginService loginService;
     private final JDA jda;
     private final String postAction;
@@ -27,7 +29,7 @@ public class HttpLoginServer {
     private Javalin app;
     private final AuditLogger audit;
 
-    public HttpLoginServer(LoginService loginService,
+    public HttpLoginServer(WebServerInfo webServerInfo, LoginService loginService,
                            JDA jda,
                            String postAction,
                            String postText,
@@ -35,6 +37,7 @@ public class HttpLoginServer {
                            String targetGuildId,
                            String inviteChannelId,
                            AuditLogger audit) {
+        this.webServerInfo = webServerInfo;
         this.loginService = loginService;
         this.jda = jda;
         this.postAction = postAction == null ? "text" : postAction.trim().toLowerCase();
@@ -45,28 +48,29 @@ public class HttpLoginServer {
         this.audit = audit;
     }
 
-    public void start(int port) {
-        app = Javalin.create(javalinConfig -> javalinConfig.showJavalinBanner = false).start(port);
-        app.get("/login", this::handleLogin);
-        app.get("/oauth/callback", this::handleCallback);
-        log.info("Running web server on port: {}", port);
+    public void start() {
+        app = Javalin.create(javalinConfig -> javalinConfig.showJavalinBanner = false).start(webServerInfo.host(), webServerInfo.port());
+        app.get(webServerInfo.loginEndpoint(), this::handleLogin);
+        app.get(webServerInfo.callbackEndpoint(), this::handleCallback);
+        log.info("Running web server on {}:{} (login: {} callback: {})",webServerInfo.host() , webServerInfo.port(), webServerInfo.getPublicLoginURL(), webServerInfo.getPublicCallbackURL());
     }
-
+        
     public void stop() {
         if (app != null) app.stop();
     }
 
-    public void restart(int port){
-        if (app != null && app.port() != port) {
+    public void restart(WebServerInfo newWebServerInfo){
+        if (app != null && newWebServerInfo != null && app.port() != newWebServerInfo.port()) {
+            this.webServerInfo = newWebServerInfo;
             app.stop();
-            start(port);
+            start();
         }
     }
 
     private void handleLogin(@NotNull Context ctx) {
         String state = ctx.queryParam("state");
         if (state == null || state.isBlank()) {
-            ctx.status(400).result("Missing state");
+            ctx.status(400).result("Missing state token (What are you trying to find there?)");
             return;
         }
 
@@ -82,7 +86,7 @@ public class HttpLoginServer {
                     "state", state,
                     "error", ex.getMessage() == null ? "error" : ex.getMessage()
             ));
-            ctx.status(400).result("Invalid or expired login state");
+            ctx.status(400).result("Invalid or expired login state (Try to rejoin into game and try again)");
         }
     }
 
@@ -90,7 +94,7 @@ public class HttpLoginServer {
         String code  = ctx.queryParam("code");
         String state = ctx.queryParam("state");
         if (code == null || state == null) {
-            ctx.status(400).result("Missing code/state");
+            ctx.status(400).result("Missing code or state tokens (Are you find something there?)");
             return;
         }
         try {
@@ -143,7 +147,7 @@ public class HttpLoginServer {
 
     private boolean handleDiscordInvite(@NotNull Context ctx) {
         if (jda == null) {
-            log.warn("Trying to get invite link while discord is not ready yet!");
+            log.warn("Bot is down (How did you get here?)");
             return false;
         }
         if (targetGuildId == null || targetGuildId.isBlank() || inviteChannelId == null || inviteChannelId.isBlank()) {
@@ -152,12 +156,12 @@ public class HttpLoginServer {
         }
         Guild guild = jda.getGuildById(targetGuildId);
         if (guild == null) {
-            log.warn("Guild provided in discord.targetGuildId not found!");
+            log.warn("Guild provided in discord.targetGuildId is no where to be found!");
             return false;
         }
         TextChannel ch = guild.getTextChannelById(inviteChannelId);
         if (ch == null) {
-            log.warn("Invite channel provided in discord.inviteChannelId not found!");
+            log.warn("Invite channel provided in discord.inviteChannelId is no where to be found!");
             return false;
         }
         try {

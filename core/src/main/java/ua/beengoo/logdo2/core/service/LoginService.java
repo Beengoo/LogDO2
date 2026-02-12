@@ -1,5 +1,7 @@
 package ua.beengoo.logdo2.core.service;
 
+import lombok.extern.slf4j.Slf4j;
+import ua.beengoo.logdo2.api.entity.WebServerInfo;
 import ua.beengoo.logdo2.api.events.*;
 import ua.beengoo.logdo2.api.spi.PlatformBridge;
 import ua.beengoo.logdo2.api.spi.callbacks.LoginCallbacks;
@@ -12,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Logger;
 
+@Slf4j(topic = "LogDO2")
 public class LoginService {
     private final OAuthProvider oauth;
     private DiscordMessagesProvider dm;
@@ -20,9 +23,7 @@ public class LoginService {
     private final TokensRepo tokens;
     private final LoginStateService state;
     private final DiscordUserRepo discordUserRepo;
-    private final Logger log;
-    private final String publicUrl;
-    private final String redirectUri;
+    private final WebServerInfo webServerInfo;
     private final PlatformBridge platform;
     private final LoginCallbacks callbacks;
     private final MessagesProvider msg;
@@ -32,8 +33,8 @@ public class LoginService {
 
     public LoginService(OAuthProvider oauth, DiscordMessagesProvider dm,
                         AccountsRepo accounts, ProfileRepo profiles, TokensRepo tokens,
-                        LoginStateService state, Logger log,
-                        String publicUrl,
+                        LoginStateService state,
+                        WebServerInfo webServerInfo,
                         DiscordUserRepo discordUserRepo,
                         BanProgressRepo banProgressRepo,
                         PropertiesProvider propertiesProvider,
@@ -46,9 +47,7 @@ public class LoginService {
         this.profiles = profiles;
         this.tokens = tokens;
         this.state = state;
-        this.log = log;
-        this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length()-1) : publicUrl;
-        this.redirectUri = publicUrl + "/oauth/callback";
+        this.webServerInfo = webServerInfo;
         this.discordUserRepo = discordUserRepo;
         this.msg = messages;
         this.platform = platform;
@@ -119,7 +118,7 @@ public class LoginService {
     public String buildDiscordAuthUrl(String stateToken) {
         if (!state.hasOAuthState(stateToken))
             throw new IllegalStateException("Unknown or expired login state");
-        return oauth.buildAuthUrl(stateToken, redirectUri);
+        return oauth.buildAuthUrl(stateToken, webServerInfo.getPublicCallbackURL());
     }
 
     public String createOAuthState(UUID uuid, String ip, String name, boolean bedrock) {
@@ -128,7 +127,7 @@ public class LoginService {
 
     public void handleWebServerCallback(String code, String stateToken) {
         var st = state.consumeOAuthState(stateToken);
-        var tokenSet = oauth.exchangeCode(code, redirectUri);
+        var tokenSet = oauth.exchangeCode(code, webServerInfo.getPublicCallbackURL());
         var user = oauth.fetchUser(tokenSet.accessToken());
         Properties props = propertiesProvider.getSnapshot();
 
@@ -168,7 +167,7 @@ public class LoginService {
         profiles.updateLastConfirmedIp(st.uuid(), st.ip());
         profiles.updatePlatform(st.uuid(), st.bedrock() ? "BEDROCK" : "JAVA");
 
-        if (dm != null) dm.sendGreetingsMessage(user.id(), st.uuid(), st.name(), publicUrl);
+        if (dm != null) dm.sendGreetingsMessage(user.id(), st.uuid(), st.name());
         state.clearPendingLogin(st.uuid());
 
         firePhaseExit(st.uuid(), LoginPhase.LOGIN, LoginExitReason.LOGIN_SUCCESS);
@@ -177,7 +176,7 @@ public class LoginService {
     public void acceptNewAddress(UUID profileUuid, long discordUserId) {
         Optional<Long> owner = accounts.findDiscordForProfile(profileUuid);
         if (owner.isEmpty() || owner.get() != discordUserId) {
-            log.warning("Canceled accept attempt on profile that has no record. (another bot instance is running?) profile=" + profileUuid + " by " + discordUserId);
+            log.warn("Canceled accept attempt on profile that has no record. (another bot instance is running?) profile={} by {}", profileUuid, discordUserId);
             return;
         }
         var pending = state.consumePendingIpConfirm(profileUuid);
@@ -191,7 +190,7 @@ public class LoginService {
     public void rejectNewAddress(UUID profileUuid, long discordUserId) {
         Optional<Long> owner = accounts.findDiscordForProfile(profileUuid);
         if (owner.isEmpty() || owner.get() != discordUserId) {
-            log.warning("Canceled rejection attempt on profile that has no record. (another bot instance is running?) profile=" + profileUuid + " by " + discordUserId);
+            log.warn("Canceled rejection attempt on profile that has no record. (another bot instance is running?) profile={} by {}", profileUuid, discordUserId);
             return;
         }
 
@@ -218,8 +217,7 @@ public class LoginService {
         profiles.updatePlatform(pending.uuid(), "BEDROCK");
 
         String token = state.createOAuthState(pending.uuid(), pending.ip(), pending.name(), true);
-        String loginUrl = publicUrl + "/login?state=" + token;
-        if (dm != null) dm.sendOAuth2URLMessage(discordUserId, loginUrl);
+        if (dm != null) dm.sendOAuth2URLMessage(discordUserId, webServerInfo.displayableUrl());
 
         return true;
     }
@@ -235,10 +233,10 @@ public class LoginService {
     }
 
     private void firePhaseEnter(UUID uuid, LoginPhase phase, LoginCallbacks.PlayerLoginData data) {
-        callbacks.onPhaseEnter(uuid, phase, data);
+        callbacks.onLoginPhaseEnter(uuid, phase, data);
     }
 
     private void firePhaseExit(UUID uuid, LoginPhase phase, LoginExitReason cause) {
-        callbacks.onPhaseExit(uuid, phase, cause);
+        callbacks.onLoginPhaseExit(uuid, phase, cause);
     }
 }

@@ -25,7 +25,7 @@ public interface LoginCallbacks {
      * @param phase The login phase being entered
      * @param data Additional data about the login phase
      */
-    void onPhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginData data);
+    void onLoginPhaseEnter(UUID uuid, LoginPhase phase, PlayerLoginData data);
 
     /**
      * Called when a player exits a login phase
@@ -33,7 +33,7 @@ public interface LoginCallbacks {
      * @param phase The login phase being exited
      * @param reason The reason for exiting the phase
      */
-    void onPhaseExit(UUID uuid, LoginPhase phase, LoginExitReason reason);
+    void onLoginPhaseExit(UUID uuid, LoginPhase phase, LoginExitReason reason);
 
     /**
      * Called when a player's IP address has been confirmed
