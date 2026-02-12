@@ -110,8 +110,6 @@ public class DatabaseManager {
                 } catch (Exception ignored) {}
                 return false;
             };
-
-            // Create base tables
             st.execute("""
                 CREATE TABLE IF NOT EXISTS discord_accounts (
                   discord_id         INTEGER PRIMARY KEY,
