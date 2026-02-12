@@ -53,7 +53,7 @@ public class HttpLoginServer {
         app = Javalin.create(javalinConfig -> javalinConfig.showJavalinBanner = false).start(wsi.host(), wsi.port());
         app.get(wsi.loginEndpoint(), this::handleLogin);
         app.get(wsi.callbackEndpoint(), this::handleCallback);
-        log.info("Running web server on {}:{} (login: {} callback: {})",wsi.host() , wsi.port(), wsi.getPublicLoginURL(), wsi.getPublicCallbackURL());
+        log.info("Running web server {}", wsi);
     }
         
     public void stop() {
