@@ -60,6 +60,7 @@ import ua.beengoo.logdo2.plugin.conditions.login.LogDO2LoginConditionsProvider;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 
 @Slf4j(topic = "LogDO2")
 public final class LogDO2 extends JavaPlugin {
@@ -109,6 +110,7 @@ public final class LogDO2 extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        printBanner();
         instance = this;
         configureLogging();
         Config.init(this);
@@ -254,6 +256,27 @@ public final class LogDO2 extends JavaPlugin {
         log.info("Database in use: {}", db.dialect());
         log.info("LogDO2 is ready!");
     }
+
+    private void printBanner(){
+        String[] splashes = new String[]{
+                "Where do i type password?",
+                "Hytale soon",
+                "By Beengoo",
+                "Not that simple as it sounds"
+        };
+        String art = """
+                    __                ____  ____ ___\s
+                   / /   ____  ____ _/ __ \\/ __ \\__ \\
+                  / /   / __ \\/ __ `/ / / / / / /_/ /
+                 / /___/ /_/ / /_/ / /_/ / /_/ / __/\s
+                /_____/\\____/\\__, /_____/\\____/____/\s
+                            /____/                  \s
+                > %s
+                """.formatted(splashes[new Random().nextInt(0, splashes.length-1)]);
+
+        for (String line:art.split("\n")) {log.info(line);}
+    }
+
     public void startJDA(String botToken, List<String> intentNames,
                         boolean enableCacheChunking, boolean cacheAllGuildMembers,
                          List<String> cacheFlags){
