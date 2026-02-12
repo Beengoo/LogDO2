@@ -18,11 +18,11 @@ public record WebServerInfo(
     @Override
     public @NotNull String toString() {
         return "WebServerInfo{" +
-                "host=" + host +
-                "port=" + port +
-                "displayableUrl=" + displayableUrl +
-                "publicLoginURL=" + getPublicLoginURL() +
-                "publicCallbackURL=" + getPublicCallbackURL() +
+                "host=" + host + ", " +
+                "port=" + port + ", " +
+                "displayableUrl=" + displayableUrl + ", " +
+                "publicLoginURL=" + getPublicLoginURL() + ", " +
+                "publicCallbackURL=" + getPublicCallbackURL() + ", " +
                 "}";
     }
 }
