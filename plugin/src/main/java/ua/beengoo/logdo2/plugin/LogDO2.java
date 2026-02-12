@@ -300,10 +300,10 @@ public final class LogDO2 extends JavaPlugin {
                         }
                 ).enableCache(EnumsUtil.parseEnums(CacheFlag.class, cacheFlags));
 
-        if (enableCacheChunking) {
+        if (cacheAllGuildMembers) {
             jdaBuilder.setMemberCachePolicy(MemberCachePolicy.ALL);
         }
-        if (cacheAllGuildMembers) {
+        if (enableCacheChunking) {
             jdaBuilder.setChunkingFilter(ChunkingFilter.ALL);
         }
         this.jda = jdaBuilder.build();

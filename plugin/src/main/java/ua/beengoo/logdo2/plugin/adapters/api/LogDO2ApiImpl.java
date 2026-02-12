@@ -61,11 +61,6 @@ public class LogDO2ApiImpl implements LogDO2Api {
     }
 
     @Override
-    public boolean isLinked(UUID uuid) {
-        return accounts.isLinked(uuid);
-    }
-
-    @Override
     public boolean isActionAllowed(UUID uuid, String currentIp) {
         return service.isActionAllowed(uuid, currentIp);
     }

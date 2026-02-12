@@ -54,13 +54,6 @@ public interface LogDO2Api {
     String getTargetGuildId();
 
     /**
-     * Check if a Minecraft profile is linked to a Discord account
-     * @param uuid The Minecraft player UUID
-     * @return true if linked, false otherwise
-     */
-    boolean isLinked(UUID uuid);
-
-    /**
      * Check if a player is allowed to perform actions (linked and IP confirmed)
      * @param uuid The Minecraft player UUID
      * @param currentIp The player's current IP address
