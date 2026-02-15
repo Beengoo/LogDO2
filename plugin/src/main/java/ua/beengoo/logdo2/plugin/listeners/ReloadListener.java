@@ -3,7 +3,7 @@ package ua.beengoo.logdo2.plugin.listeners;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import ua.beengoo.logdo2.api.entity.WebServerInfo;
-import ua.beengoo.logdo2.api.events.LogDO2ReloadEvent;
+import ua.beengoo.logdo2.api.events.bukkit.LogDO2ReloadEvent;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.config.Config;
 

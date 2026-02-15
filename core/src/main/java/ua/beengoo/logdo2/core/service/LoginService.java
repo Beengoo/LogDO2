@@ -2,7 +2,8 @@ package ua.beengoo.logdo2.core.service;
 
 import lombok.extern.slf4j.Slf4j;
 import ua.beengoo.logdo2.api.entity.WebServerInfo;
-import ua.beengoo.logdo2.api.events.*;
+import ua.beengoo.logdo2.api.events.LoginExitReason;
+import ua.beengoo.logdo2.api.events.LoginPhase;
 import ua.beengoo.logdo2.api.spi.PlatformBridge;
 import ua.beengoo.logdo2.api.spi.callbacks.LoginCallbacks;
 import ua.beengoo.logdo2.api.spi.repo.*;
@@ -12,7 +13,6 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 @Slf4j(topic = "LogDO2")
 public class LoginService {

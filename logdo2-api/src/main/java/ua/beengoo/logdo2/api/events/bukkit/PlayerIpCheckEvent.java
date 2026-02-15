@@ -1,4 +1,4 @@
-package ua.beengoo.logdo2.api.events;
+package ua.beengoo.logdo2.api.events.bukkit;
 
 import lombok.Getter;
 import lombok.Setter;

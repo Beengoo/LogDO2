@@ -3,7 +3,9 @@ package ua.beengoo.logdo2.plugin.adapters.platform;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import ua.beengoo.logdo2.api.events.*;
+import ua.beengoo.logdo2.api.events.LoginExitReason;
+import ua.beengoo.logdo2.api.events.LoginPhase;
+import ua.beengoo.logdo2.api.events.bukkit.*;
 import ua.beengoo.logdo2.api.spi.callbacks.LoginCallbacks;
 
 import java.util.UUID;

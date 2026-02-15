@@ -19,7 +19,7 @@ import ua.beengoo.logdo2.api.LogDO2Api;
 import ua.beengoo.logdo2.api.entity.LinkInfo;
 import ua.beengoo.logdo2.api.entity.LogDO2Profile;
 import ua.beengoo.logdo2.api.entity.LogDO2ProfileStatus;
-import ua.beengoo.logdo2.api.events.LogDO2ReloadEvent;
+import ua.beengoo.logdo2.api.events.bukkit.LogDO2ReloadEvent;
 import ua.beengoo.logdo2.api.spi.repo.*;
 import ua.beengoo.logdo2.api.spi.providers.MessagesProvider;
 import ua.beengoo.logdo2.core.service.LoginStateService;

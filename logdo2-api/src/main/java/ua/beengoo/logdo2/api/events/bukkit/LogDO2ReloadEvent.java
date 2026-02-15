@@ -1,4 +1,4 @@
-package ua.beengoo.logdo2.api.events;
+package ua.beengoo.logdo2.api.events.bukkit;
 
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;

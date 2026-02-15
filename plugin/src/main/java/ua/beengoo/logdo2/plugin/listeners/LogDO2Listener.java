@@ -2,9 +2,8 @@ package ua.beengoo.logdo2.plugin.listeners;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import ua.beengoo.logdo2.api.events.PlayerIpConfirmedEvent;
-import ua.beengoo.logdo2.api.events.PlayerLoginPhaseEnterEvent;
-import ua.beengoo.logdo2.api.events.PlayerLoginPhaseExitEvent;
+import ua.beengoo.logdo2.api.events.bukkit.PlayerLoginPhaseEnterEvent;
+import ua.beengoo.logdo2.api.events.bukkit.PlayerLoginPhaseExitEvent;
 import ua.beengoo.logdo2.plugin.LogDO2;
 import ua.beengoo.logdo2.plugin.actions.Action;
 import ua.beengoo.logdo2.plugin.config.Config;
