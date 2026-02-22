@@ -1,4 +1,8 @@
 # LogDO2
+
+> [!NOTE]
+> This project is now moved to [Codeberg](https://codeberg.org/Pinecraft/LogDO2).
+> This repository is not a mirror, this is legacy one!
 ### Authorize your Minecraft profile with just \*one click\*!
 
 LogDO2 - Is simple Discord OAuth2 login implementation for Minecraft servers.
